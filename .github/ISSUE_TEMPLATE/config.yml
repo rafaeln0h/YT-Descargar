@@ -1,9 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Ideas y conversación
+    url: https://github.com/rafaeln0h/YT-Descargar/discussions
+    about: Comparte ideas abiertas, preguntas generales y experiencias con la comunidad.
   - name: Reporte privado de seguridad
     url: https://github.com/rafaeln0h/YT-Descargar/security/advisories/new
     about: No publiques vulnerabilidades explotables como issues.
   - name: Documentación
     url: https://github.com/rafaeln0h/YT-Descargar/tree/main/docs
     about: Revisa instalación, diagnóstico, API y roadmap.
-

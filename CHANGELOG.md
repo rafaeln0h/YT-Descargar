@@ -4,6 +4,28 @@ Este proyecto sigue un esquema incremental propio (`0.012`, `0.013`, …).
 
 ## [0.012] - 2026-07-31
 
+- Interfaz completa inspirada en YouTube Music en las páginas principales, con
+  pestañas, animaciones accesibles, biblioteca lateral y reproducción integrada.
+- Se elimina la ruta experimental `/suite`; sus funciones permanecen conectadas
+  desde el descargador y Configuración.
+- Covers cuadrados de alta calidad con prioridad para el arte del álbum, procedencia
+  incrustada y reparación opcional de bibliotecas existentes.
+- Biblioteca moderna navegable por artistas, álbumes, playlists, canciones y videos,
+  con covers reales, distintivo y panel de letras.
+- Reproductor con cola contextual, anterior/siguiente, shuffle, repetición, volumen,
+  Media Session y recuperación automática si un archivo desaparece.
+- Escaneo incremental en memoria por tamaño y fecha de modificación, tolerante a
+  archivos borrados, corruptos, inaccesibles o movidos durante la exploración.
+- Cola por lotes persistente en el backend y respaldo local de tareas aún no
+  enviadas.
+- Enriquecimiento de álbumes oficiales de YouTube Music mediante una sola pista
+  completa para conservar artista del álbum, año, álbum y numeración.
+- PWA, service worker, notificaciones con consentimiento y Media Session.
+- Reparación inteligente de la biblioteca existente, overrides manuales,
+  fingerprint acústico opcional, Discogs y análisis ReplayGain.
+- Limpieza de cachés y entorno roto, retirada de la dependencia redundante
+  `pyacoustid` y consolidación del workflow de publicación.
+
 ### Añadido
 
 - Fuente única de versión y endpoint de capacidades.

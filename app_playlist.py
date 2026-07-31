@@ -4,6 +4,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
@@ -11,18 +12,26 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 import musicbrainzngs
 import requests
 import yt_dlp
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_cors import CORS
-from mutagen.id3 import APIC, ID3, ID3NoHeaderError
-from mutagen.mp4 import MP4, MP4Cover
+from mutagen import File as MutagenFile
 
 from setup_ffmpeg import ensure_ffmpeg
 from ymd.cleanup import remove_generated_sidecars
-from ymd.enrichment import enrich_with_musicbrainz
+from ymd.covers import (
+    clean_album,
+    clean_artist,
+    download_square_cover,
+    musicbrainz_release_matches,
+    normalized_identity,
+    write_cover,
+)
+from ymd.enrichment import enrich_metadata
 from ymd.logging_config import YTDLPLogger, setup_logging
 from ymd.lyrics import lookup_lrclib
 from ymd.metadata import (
     apply_metadata_defaults,
+    apply_official_album_context,
     merge_ytdlp_metadata,
 )
 from ymd.metadata import (
@@ -31,6 +40,8 @@ from ymd.metadata import (
 from ymd.metadata import (
     write_metadata as write_metadata_tags,
 )
+from ymd.overrides import apply_metadata_overrides, load_overrides, upsert_override
+from ymd.repair import repair_library as repair_media_library
 from ymd.routes import create_services_blueprint
 from ymd.version import VERSION
 
@@ -53,10 +64,33 @@ CORS(
 
 CONFIG_FILE = Path.home() / ".ymd_config.json"
 HISTORY_FILE = Path.home() / ".ymd_history.json"
+BATCH_FILE = Path.home() / ".ymd_batch_queue.json"
 DOWNLOAD_QUEUE = {}
 QUEUE_ID = 0
 QUEUE_LOCK = threading.Lock()
 HISTORY_LOCK = threading.Lock()
+BATCH_LOCK = threading.Lock()
+BATCH_WAKE = threading.Event()
+BATCH_JOBS = []
+BATCH_LOADED = False
+BATCH_THREAD = None
+COVER_REPAIR_LOCK = threading.Lock()
+COVER_REPAIR_STATE = {
+    'status': 'idle',
+    'processed_albums': 0,
+    'total_albums': 0,
+    'updated_files': 0,
+    'failed_albums': 0,
+    'message': 'Sin reparacion activa',
+}
+METADATA_REPAIR_LOCK = threading.Lock()
+METADATA_REPAIR_STATE = {
+    'status': 'idle',
+    'mode': 'dry-run',
+    'summary': {},
+    'journal_path': '',
+    'message': 'Sin reparación de metadatos activa',
+}
 
 APPLICATION_LOG = setup_logging(Path(__file__).resolve().parent / "logs")
 LOGGER = logging.getLogger("ymd.app")
@@ -65,9 +99,10 @@ musicbrainzngs.set_useragent("YT-Descargar", VERSION)
 DEFAULT_CONFIG = {
     'download_path': str(Path.home() / 'Music' / 'YouTube'),
     'archive_file': str(Path.home() / '.ymd_download_archive.txt'),
-    'folder_structure': '{artist}/{year} - {album}',
+    'folder_structure': '{album_artist}/{year} - {album}',
     'filename_format': '{track:02d} - {title}',
-    'playlist_folder_mode': 'inherit',
+    'playlist_filename_format': '{playlist_track:02d} - {title}',
+    'playlist_folder_mode': 'smart',
     'playlist_folder_template': '',
     'download_mode': 'audio',
     'audio_format': 'mp3',
@@ -80,8 +115,8 @@ DEFAULT_CONFIG = {
     'embed_subtitles': False,
     'playlist_tag_album_mode': 'smart',
     'playlist_tag_artist_mode': 'detected',
-    'playlist_tag_album_artist_mode': 'playlist_owner',
-    'playlist_track_number_mode': 'album',
+    'playlist_tag_album_artist_mode': 'smart',
+    'playlist_track_number_mode': 'smart',
     'playlist_tag_genre_mode': 'empty',
     'playlist_default_genre': '',
     'use_download_archive': True,
@@ -94,7 +129,9 @@ DEFAULT_CONFIG = {
     'sleep_interval': 0,
     'max_sleep_interval': 0,
     'auto_metadata': True,
-    'metadata_sources': ['musicbrainz', 'manual'],
+    'metadata_sources': ['ytmusic', 'musicbrainz', 'acoustid', 'discogs', 'manual'],
+    'metadata_min_confidence': 0.90,
+    'metadata_overrides_file': str(Path.home() / '.ymd_metadata_overrides.json'),
     'embed_extended_metadata': True,
     'duplicate_mode': 'skip',
     'smart_organize': True,
@@ -105,6 +142,9 @@ DEFAULT_CONFIG = {
     'ui_item_search': '',
     'ui_display_filter': 'all',
     'library_scan_limit': 300,
+    'check_for_updates': True,
+    'github_repository': 'rafaeln0h/YT-Descargar',
+    'update_check_interval_hours': 12,
     'metadata_defaults': {
         'composer': '',
         'publisher': '',
@@ -125,6 +165,18 @@ DEFAULT_CONFIG = {
         'catalog_number': '',
         'barcode': '',
         'mood': '',
+        'original_release_date': '',
+        'lyricist': '',
+        'producer': '',
+        'conductor': '',
+        'remixer': '',
+        'performers': '',
+        'key': '',
+        'title_sort': '',
+        'artist_sort': '',
+        'album_sort': '',
+        'album_artist_sort': '',
+        'composer_sort': '',
     },
 }
 
@@ -245,6 +297,180 @@ def create_history_payload(data):
         return {}
 
 
+def load_batch_jobs():
+    global BATCH_LOADED, BATCH_JOBS
+    with BATCH_LOCK:
+        if BATCH_LOADED:
+            return list(BATCH_JOBS)
+        loaded = []
+        if BATCH_FILE.exists():
+            try:
+                payload = json.loads(BATCH_FILE.read_text(encoding='utf-8'))
+                if isinstance(payload, list):
+                    loaded = [item for item in payload if isinstance(item, dict)]
+            except Exception as exc:
+                LOGGER.warning("No se pudo leer la cola persistente: %s", exc)
+        for item in loaded:
+            if item.get('status') in {'starting', 'running'}:
+                item['status'] = 'pending'
+                item['queue_id'] = None
+                item['message'] = 'Recuperada despues de reiniciar la aplicacion'
+        BATCH_JOBS = loaded[-100:]
+        BATCH_LOADED = True
+        return list(BATCH_JOBS)
+
+
+def save_batch_jobs_locked():
+    BATCH_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = BATCH_FILE.with_suffix(BATCH_FILE.suffix + '.tmp')
+    temp_file.write_text(
+        json.dumps(BATCH_JOBS[-100:], indent=2, ensure_ascii=False),
+        encoding='utf-8',
+    )
+    temp_file.replace(BATCH_FILE)
+
+
+def batch_signature(kind, payload):
+    return f"{(kind or 'single').lower()}|{normalize_input_url((payload or {}).get('url'))}"
+
+
+def public_batch_job(item):
+    return {
+        key: value for key, value in item.items()
+        if key != 'payload'
+    } | {
+        'source_url': (item.get('payload') or {}).get('url', ''),
+        'type': item.get('kind', 'single'),
+    }
+
+
+def enqueue_batch_jobs(items):
+    load_batch_jobs()
+    created = []
+    now = datetime.now().isoformat(timespec='seconds')
+    with BATCH_LOCK:
+        active_signatures = {
+            item.get('signature') for item in BATCH_JOBS
+            if item.get('status') in {'pending', 'starting', 'running'}
+        }
+        for source in items:
+            kind = (source.get('kind') or 'single').strip().lower()
+            payload = create_history_payload(source.get('payload') or {})
+            signature = batch_signature(kind, payload)
+            if signature in active_signatures:
+                continue
+            job = {
+                'job_id': uuid.uuid4().hex[:12],
+                'kind': kind,
+                'label': (source.get('label') or payload.get('title') or payload.get('album') or 'Descarga').strip(),
+                'payload': payload,
+                'signature': signature,
+                'status': 'pending',
+                'progress': 0,
+                'message': 'En espera en la cola persistente',
+                'queue_id': None,
+                'created_at': now,
+                'updated_at': now,
+            }
+            BATCH_JOBS.append(job)
+            active_signatures.add(signature)
+            created.append(public_batch_job(job))
+        save_batch_jobs_locked()
+    if created:
+        ensure_batch_dispatcher()
+        BATCH_WAKE.set()
+    return created
+
+
+def update_batch_job(job_id, patch):
+    with BATCH_LOCK:
+        for item in BATCH_JOBS:
+            if item.get('job_id') == job_id:
+                item.update(patch)
+                item['updated_at'] = datetime.now().isoformat(timespec='seconds')
+                save_batch_jobs_locked()
+                return item
+    return None
+
+
+def batch_dispatcher_worker():
+    while True:
+        load_batch_jobs()
+        with BATCH_LOCK:
+            backend_busy = any(
+                is_active_queue_status(queue.get('status'))
+                for queue in DOWNLOAD_QUEUE.values()
+            )
+            job = None if backend_busy else next(
+                (item for item in BATCH_JOBS if item.get('status') == 'pending'),
+                None,
+            )
+            if job:
+                job['status'] = 'starting'
+                job['message'] = 'Iniciando desde la cola persistente'
+                job['updated_at'] = datetime.now().isoformat(timespec='seconds')
+                save_batch_jobs_locked()
+                job_id = job.get('job_id')
+                kind = job.get('kind')
+                payload = dict(job.get('payload') or {})
+            else:
+                job_id = None
+
+        if not job_id:
+            BATCH_WAKE.wait(timeout=3)
+            BATCH_WAKE.clear()
+            continue
+
+        try:
+            queue_id = (
+                start_playlist_download(payload)
+                if kind == 'playlist'
+                else start_single_download(payload)
+            )
+            update_batch_job(job_id, {
+                'status': 'running',
+                'queue_id': queue_id,
+                'message': 'Descarga iniciada en el backend',
+            })
+
+            while True:
+                queue = DOWNLOAD_QUEUE.get(queue_id)
+                if not queue:
+                    raise RuntimeError('La tarea activa ya no existe en el backend')
+                queue_status = queue.get('status')
+                terminal_map = {
+                    'completado': 'completed',
+                    'error': 'error',
+                    'cancelado': 'cancelled',
+                }
+                update_batch_job(job_id, {
+                    'status': terminal_map.get(queue_status, 'running'),
+                    'progress': queue.get('progress', 0),
+                    'message': queue.get('message', ''),
+                    'destination': queue.get('destination', ''),
+                    'downloaded': queue.get('downloaded', 0),
+                    'failed': queue.get('failed', 0),
+                })
+                if queue_status in terminal_map:
+                    break
+                time.sleep(1)
+        except Exception as exc:
+            LOGGER.exception("Fallo la tarea persistente %s", job_id)
+            update_batch_job(job_id, {'status': 'error', 'message': str(exc)})
+
+
+def ensure_batch_dispatcher():
+    global BATCH_THREAD
+    if BATCH_THREAD and BATCH_THREAD.is_alive():
+        return
+    BATCH_THREAD = threading.Thread(
+        target=batch_dispatcher_worker,
+        name='ymd-persistent-queue',
+        daemon=True,
+    )
+    BATCH_THREAD.start()
+
+
 def pick_best_thumbnail(entry):
     if not isinstance(entry, dict):
         return ''
@@ -288,6 +514,44 @@ def save_config(config):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
 
+def apply_configured_metadata_overrides(metadata, config):
+    overrides_path = config.get('metadata_overrides_file') or DEFAULT_CONFIG['metadata_overrides_file']
+    return apply_metadata_overrides(metadata, load_overrides(overrides_path))
+
+
+def apply_automatic_metadata_enrichment(metadata, config, *, audio_path=None, detailed=False):
+    sources = set(config.get('metadata_sources') or [])
+    result = enrich_metadata(
+        metadata,
+        audio_path=audio_path,
+        use_musicbrainz='musicbrainz' in sources,
+        use_ytmusic='ytmusic' in sources,
+        use_acoustid='acoustid' in sources,
+        use_discogs='discogs' in sources,
+        acoustid_api_key=os.environ.get('ACOUSTID_API_KEY', ''),
+        discogs_token=os.environ.get('DISCOGS_TOKEN', ''),
+        detailed_musicbrainz=bool(detailed),
+        timeout=12,
+    )
+    enriched = dict(result.get('metadata') or metadata)
+    successful_sources = [
+        str(provider.get('provider'))
+        for provider in result.get('providers') or []
+        if provider.get('status') == 'ok'
+    ]
+    if successful_sources:
+        enriched['metadata_sources_used'] = '; '.join(dict.fromkeys(successful_sources))
+    enriched['metadata_confidence'] = json.dumps(
+        result.get('confidence') or {}, ensure_ascii=False, separators=(',', ':')
+    )
+    enriched['metadata_missing'] = '; '.join(result.get('unavailable') or [])
+    enriched['enrichment_status'] = 'complete' if not result.get('unavailable') else 'partial'
+    enriched['enrichment_providers_json'] = json.dumps(
+        result.get('providers') or [], ensure_ascii=False, separators=(',', ':')
+    )[:8000]
+    return enriched
+
+
 app.register_blueprint(
     create_services_blueprint(load_config, log_path=APPLICATION_LOG)
 )
@@ -316,6 +580,7 @@ def build_runtime_config(request_data):
         'playlist_default_genre',
         'folder_structure',
         'filename_format',
+        'playlist_filename_format',
         'playlist_folder_mode',
         'playlist_folder_template',
         'duplicate_mode'
@@ -332,7 +597,8 @@ def build_runtime_config(request_data):
         'write_subtitles',
         'embed_subtitles',
         'use_download_archive',
-        'embed_extended_metadata'
+        'embed_extended_metadata',
+        'check_for_updates'
     ):
         if key in request_data:
             config[key] = bool(request_data.get(key))
@@ -755,6 +1021,9 @@ def expand_download_items(items):
             entries = info.get('entries') if info else []
             collection_title = (info or {}).get('title') or raw.get('title') or 'Collection'
             collection_artist = (info or {}).get('uploader') or raw.get('artist') or 'Unknown'
+            collection_cover = pick_best_thumbnail(info or {}) or raw.get('thumbnail') or ''
+            collection_id = (parse_qs(urlparse(url).query).get('list') or [''])[0]
+            collection_kind = 'official_album' if collection_id.startswith('OLAK5uy_') else 'playlist'
             for idx, entry in enumerate(entries or [], 1):
                 if not entry:
                     continue
@@ -774,6 +1043,10 @@ def expand_download_items(items):
                     'genre': (entry.get('genres') or [entry.get('genre', '')])[0],
                     'composer': entry.get('composer', ''),
                     'thumbnail': pick_best_thumbnail(entry),
+                    'playlist_cover_url': collection_cover,
+                    'collection_title': collection_title,
+                    'collection_artist': collection_artist,
+                    'collection_kind': collection_kind,
                     'url': song_url,
                     'item_type': 'song',
                 })
@@ -791,6 +1064,10 @@ def expand_download_items(items):
                 'genre': raw.get('genre', ''),
                 'composer': raw.get('composer', ''),
                 'thumbnail': raw.get('thumbnail', ''),
+                'playlist_cover_url': raw.get('playlist_cover_url', ''),
+                'collection_title': raw.get('collection_title', ''),
+                'collection_artist': raw.get('collection_artist', ''),
+                'collection_kind': raw.get('collection_kind', ''),
                 'url': url,
                 'item_type': 'song',
             })
@@ -961,6 +1238,11 @@ def start_playlist_download(data, queue_id=None):
     selected_items = data.get('selected_items') or videos
     album = (data.get('album') or 'Album').strip() or 'Album'
     artist = (data.get('artist') or 'Unknown').strip() or 'Unknown'
+    collection_kind = (data.get('collection_kind') or '').strip().lower()
+    if collection_kind not in {'official_album', 'playlist'}:
+        playlist_id = (parse_qs(urlparse(url).query).get('list') or [''])[0]
+        collection_kind = 'official_album' if playlist_id.startswith('OLAK5uy_') else 'playlist'
+    playlist_cover = (data.get('thumbnail') or '').strip()
     config = build_runtime_config(data)
 
     if not url and not selected_items:
@@ -1021,20 +1303,31 @@ def start_playlist_download(data, queue_id=None):
 
     thread = threading.Thread(
         target=playlist_download_worker,
-        args=(queue_id, url, selected_items, artist, album, config),
+        args=(queue_id, url, selected_items, artist, album, config, collection_kind, playlist_cover),
         daemon=True
     )
     thread.start()
     return queue_id
 
 
-def resolve_playlist_tags(video, playlist_index, playlist_title, playlist_artist, smart_organize, config, track_by_album):
+def resolve_playlist_tags(
+    video,
+    playlist_index,
+    playlist_title,
+    playlist_artist,
+    smart_organize,
+    config,
+    track_by_album,
+    *,
+    collection_kind='playlist',
+    mixed_artists=False,
+):
     detected_artist = (video.get('artist') or '').strip()
     detected_album = (video.get('album') or '').strip()
     album_mode = (config.get('playlist_tag_album_mode') or 'smart').lower()
     artist_mode = (config.get('playlist_tag_artist_mode') or 'detected').lower()
-    album_artist_mode = (config.get('playlist_tag_album_artist_mode') or 'playlist_owner').lower()
-    track_mode = (config.get('playlist_track_number_mode') or 'album').lower()
+    album_artist_mode = (config.get('playlist_tag_album_artist_mode') or 'smart').lower()
+    track_mode = (config.get('playlist_track_number_mode') or 'smart').lower()
     genre_mode = (config.get('playlist_tag_genre_mode') or 'empty').lower()
     default_genre = (config.get('playlist_default_genre') or '').strip()
 
@@ -1045,7 +1338,12 @@ def resolve_playlist_tags(video, playlist_index, playlist_title, playlist_artist
     elif album_mode == 'artist_plus_playlist':
         album_name = f"{playlist_artist} - {playlist_title}".strip(' -')
     else:
-        album_name = (detected_album if smart_organize and detected_album else playlist_title) or playlist_title
+        # A playlist is an ordering container, not necessarily an album. Keep
+        # real album data when present and leave a blank fallback for the full
+        # per-track yt-dlp lookup performed during download.
+        album_name = detected_album if smart_organize and detected_album else ''
+        if collection_kind == 'official_album':
+            album_name = album_name or playlist_title
 
     if artist_mode == 'playlist_owner':
         artist_name = playlist_artist or detected_artist or 'Unknown'
@@ -1054,7 +1352,11 @@ def resolve_playlist_tags(video, playlist_index, playlist_title, playlist_artist
     else:
         artist_name = (detected_artist if smart_organize and detected_artist else playlist_artist) or playlist_artist or 'Unknown'
 
-    if album_artist_mode == 'track_artist':
+    if album_artist_mode == 'smart':
+        album_artist = (video.get('album_artist') or '').strip()
+        if not album_artist:
+            album_artist = 'Various Artists' if mixed_artists else artist_name
+    elif album_artist_mode == 'track_artist':
         album_artist = artist_name
     elif album_artist_mode == 'various_artists':
         album_artist = 'Various Artists'
@@ -1063,7 +1365,7 @@ def resolve_playlist_tags(video, playlist_index, playlist_title, playlist_artist
     else:
         album_artist = playlist_artist or artist_name
 
-    if track_mode == 'playlist':
+    if track_mode == 'playlist' or (track_mode == 'smart' and collection_kind == 'playlist'):
         track_number = playlist_index
     else:
         next_album_track = track_by_album.get(album_name, 0) + 1
@@ -1077,7 +1379,7 @@ def resolve_playlist_tags(video, playlist_index, playlist_title, playlist_artist
     else:
         genre_name = ''
 
-    return album_name or playlist_title, artist_name, album_artist, track_number, genre_name
+    return album_name, artist_name, album_artist, track_number, genre_name
 
 
 @app.route('/')
@@ -1098,12 +1400,11 @@ def settings():
     return response
 
 
-@app.route('/suite')
-def suite():
-    response = app.make_response(render_template('suite.html'))
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
+@app.route('/service-worker.js')
+def service_worker():
+    response = send_from_directory(app.static_folder, 'service-worker.js')
+    response.headers['Cache-Control'] = 'no-cache'
+    response.headers['Service-Worker-Allowed'] = '/'
     return response
 
 
@@ -1121,6 +1422,8 @@ def get_config():
             config['folder_structure'] = DEFAULT_CONFIG['folder_structure']
         if not str(config.get('filename_format', '')).strip():
             config['filename_format'] = DEFAULT_CONFIG['filename_format']
+        if not str(config.get('playlist_filename_format', '')).strip():
+            config['playlist_filename_format'] = DEFAULT_CONFIG['playlist_filename_format']
         save_config(config)
         return jsonify({'status': 'ok', 'config': config})
     return jsonify(load_config())
@@ -1131,6 +1434,20 @@ def reset_config():
     config = dict(DEFAULT_CONFIG)
     save_config(config)
     return jsonify({'status': 'ok', 'config': config})
+
+
+@app.route('/api/metadata/overrides', methods=['GET', 'POST'])
+def metadata_overrides_api():
+    config = load_config()
+    overrides_path = config.get('metadata_overrides_file') or DEFAULT_CONFIG['metadata_overrides_file']
+    if request.method == 'GET':
+        return jsonify(load_overrides(overrides_path))
+    payload = request.get_json(silent=True) or {}
+    try:
+        saved = upsert_override(overrides_path, payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    return jsonify({'status': 'ok', 'entry': saved, 'path': str(Path(overrides_path).expanduser())})
 
 
 @app.route('/api/detect-url', methods=['POST'])
@@ -1199,6 +1516,7 @@ def detect_url():
             }), 500
 
         if url_type == 'playlist' and 'entries' in info:
+            playlist_title = info.get('title', 'Playlist')
             videos = parse_entries(
                 info.get('entries', []),
                 default_artist=info.get('uploader', 'Unknown'),
@@ -1206,11 +1524,24 @@ def detect_url():
                 source='playlist'
             )
 
+            playlist_id = (parse_qs(urlparse(url).query).get('list') or [''])[0]
+            collection_kind = 'official_album' if playlist_id.startswith('OLAK5uy_') else 'playlist'
+            if collection_kind == 'official_album' and videos:
+                full_track = extract_url_info(videos[0].get('url'), url_type='video', timeout=18)
+                if full_track:
+                    videos = apply_official_album_context(videos, playlist_title, full_track)
+
+            album_title = (videos[0].get('album') if videos else '') or playlist_title
+            album_artist = (videos[0].get('album_artist') if videos else '') or info.get('uploader') or 'Unknown'
+            album_year = (videos[0].get('year') if videos else '') or ''
+
             return jsonify({
                 'type': 'playlist',
+                'collection_kind': collection_kind,
                 'normalized_url': url,
-                'title': info.get('title', 'Playlist'),
-                'uploader': info.get('uploader', 'Unknown'),
+                'title': album_title,
+                'uploader': album_artist,
+                'year': album_year,
                 'thumbnail': pick_best_thumbnail(info),
                 'total_videos': len(info.get('entries', [])),
                 'videos': [v for v in videos if v.get('url')],
@@ -1312,7 +1643,16 @@ def download_playlist():
         return jsonify({'error': str(e)}), 500
 
 
-def playlist_download_worker(queue_id, url, selected_items, artist, album, config):
+def playlist_download_worker(
+    queue_id,
+    url,
+    selected_items,
+    artist,
+    album,
+    config,
+    collection_kind='playlist',
+    playlist_cover='',
+):
     try:
         apply_queue_control(queue_id)
         items = selected_items or []
@@ -1343,6 +1683,12 @@ def playlist_download_worker(queue_id, url, selected_items, artist, album, confi
         track_by_album = {}
         playlist_title = album or 'Playlist'
         playlist_artist = artist or 'Unknown'
+        detected_artists = {
+            str(video.get('artist') or '').strip().casefold()
+            for video in videos
+            if str(video.get('artist') or '').strip()
+        }
+        mixed_artists = len(detected_artists) > 1
 
         pending_attempts = [{'video': video, 'idx': idx, 'attempt': 1} for idx, video in enumerate(videos, 1)]
         max_item_attempts = 2  # intento inicial + 1 reintento al final
@@ -1362,14 +1708,19 @@ def playlist_download_worker(queue_id, url, selected_items, artist, album, confi
             if not video or not video.get('url'):
                 continue
 
+            item_collection_kind = video.get('collection_kind') or collection_kind
+            item_playlist_title = video.get('collection_title') or playlist_title
+            item_playlist_artist = video.get('collection_artist') or playlist_artist
             album_name, artist_name, album_artist, track_number, genre_name = resolve_playlist_tags(
                 video,
                 idx,
-                playlist_title,
-                playlist_artist,
+                item_playlist_title,
+                item_playlist_artist,
                 smart_organize,
                 config,
-                track_by_album
+                track_by_album,
+                collection_kind=item_collection_kind,
+                mixed_artists=mixed_artists,
             )
 
             metadata = {
@@ -1377,18 +1728,23 @@ def playlist_download_worker(queue_id, url, selected_items, artist, album, confi
                 'title': video.get('title', f'Track {idx}'),
                 'album': album_name,
                 'album_artist': video.get('album_artist') or album_artist,
-                'year': str(video.get('year') or datetime.now().year),
+                'year': str(video.get('year') or ''),
                 'track': video.get('track') or track_number,
                 'track_total': video.get('track_total') or total,
                 'disc': video.get('disc', ''),
                 'disc_total': video.get('disc_total', ''),
                 'genre': video.get('genre') or genre_name,
                 'composer': video.get('composer', ''),
-                'playlist_title': playlist_title,
-                'playlist_owner': playlist_artist,
+                'playlist_title': item_playlist_title,
+                'playlist_owner': item_playlist_artist,
+                'playlist_url': url,
+                'playlist_position': idx,
                 'playlist_track': idx,
                 'playlist_total': total,
-                'is_playlist_item': True
+                'playlist_cover_url': video.get('playlist_cover_url') or playlist_cover,
+                'collection_kind': item_collection_kind,
+                'compilation': item_collection_kind == 'playlist' and mixed_artists,
+                'is_playlist_item': True,
             }
             metadata = apply_metadata_defaults(
                 metadata,
@@ -1455,6 +1811,11 @@ def playlist_download_worker(queue_id, url, selected_items, artist, album, confi
         DOWNLOAD_QUEUE[queue_id]['failed_items'] = failed_items[-30:]
 
         if downloaded > 0 or skipped > 0 or replaced > 0:
+            if collection_kind == 'playlist':
+                write_playlist_manifest(
+                    DOWNLOAD_QUEUE[queue_id].get('destination'),
+                    playlist_title,
+                )
             DOWNLOAD_QUEUE[queue_id]['status'] = 'completado'
             if failed > 0:
                 DOWNLOAD_QUEUE[queue_id]['message'] = f'Completado con faltantes: {downloaded} descargadas, {failed} fallidas'
@@ -1513,7 +1874,11 @@ def build_output_paths(metadata, config):
     safe_metadata['playlist_track'] = int(metadata.get('playlist_track', 1))
 
     is_playlist_item = bool(metadata.get('is_playlist_item'))
-    folder_template = resolve_folder_template(config, is_playlist_item)
+    folder_template = resolve_folder_template(
+        config,
+        is_playlist_item,
+        collection_kind=metadata.get('collection_kind', ''),
+    )
     folder_structure = safe_format(
         folder_template,
         safe_metadata,
@@ -1522,20 +1887,70 @@ def build_output_paths(metadata, config):
     output_path = download_path / folder_structure
     output_path.mkdir(parents=True, exist_ok=True)
 
+    filename_template = config['filename_format']
+    if is_playlist_item and metadata.get('collection_kind') == 'playlist':
+        filename_template = (
+            config.get('playlist_filename_format')
+            or DEFAULT_CONFIG['playlist_filename_format']
+        )
     filename_format = safe_format(
-        config['filename_format'],
+        filename_template,
         safe_metadata,
-        default=f"{int(safe_metadata.get('track', 1)):02d} - {safe_metadata.get('title', 'Track')}"
+        default=(
+            f"{int(safe_metadata.get('playlist_track', 1)):02d} - {safe_metadata.get('title', 'Track')}"
+            if is_playlist_item and metadata.get('collection_kind') == 'playlist'
+            else f"{int(safe_metadata.get('track', 1)):02d} {safe_metadata.get('title', 'Track')}"
+        )
     )
     return output_path, filename_format
 
 
-def resolve_folder_template(config, is_playlist_item=False):
+def relocate_downloaded_family(media_path, metadata, config):
+    """Move a freshly downloaded file to its authoritative tag-derived path.
+
+    The operation is limited to the configured library root and never overwrites
+    an existing file. Subtitle/lyrics sidecars with the same stem follow it.
+    """
+
+    source = Path(media_path).resolve()
+    library_root = Path(config['download_path']).resolve()
+    destination_folder, destination_stem = build_output_paths(metadata, config)
+    destination = (destination_folder / f"{destination_stem}{source.suffix.lower()}").resolve()
+    try:
+        source.relative_to(library_root)
+        destination.relative_to(library_root)
+    except ValueError as exc:
+        raise ValueError("La reorganizacion intento salir de la biblioteca") from exc
+    if source == destination:
+        return source, destination_folder, destination_stem
+    if destination.exists():
+        LOGGER.warning("No se reorganizo %s: el destino ya existe (%s)", source, destination)
+        return source, source.parent, source.stem
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    original_stem = source.stem
+    source.replace(destination)
+    for sidecar in source.parent.glob(f"{original_stem}.*"):
+        if sidecar.suffix.lower() not in {'.vtt', '.srt', '.lrc', '.jpg', '.jpeg', '.png', '.webp'}:
+            continue
+        sidecar_destination = destination.with_suffix(sidecar.suffix.lower())
+        if not sidecar_destination.exists():
+            sidecar.replace(sidecar_destination)
+    return destination, destination_folder, destination_stem
+
+
+def resolve_folder_template(config, is_playlist_item=False, *, collection_kind=''):
     base_template = (config.get('folder_structure') or '').strip() or '{artist}/{year} - {album}'
     if not is_playlist_item:
         return base_template
 
     mode = (config.get('playlist_folder_mode') or 'inherit').strip().lower()
+    if mode == 'smart':
+        return (
+            base_template
+            if collection_kind == 'official_album'
+            else 'Playlists/{playlist_title}'
+        )
     custom_template = (config.get('playlist_folder_template') or '').strip()
     playlist_presets = {
         'inherit': base_template,
@@ -1550,6 +1965,30 @@ def resolve_folder_template(config, is_playlist_item=False):
     if mode == 'custom':
         return custom_template or base_template
     return playlist_presets.get(mode, base_template)
+
+
+def write_playlist_manifest(folder, playlist_title):
+    """Write a portable UTF-8 M3U file so players retain playlist order."""
+
+    if not folder:
+        return None
+    destination = Path(folder)
+    if not destination.is_dir():
+        return None
+    media_extensions = {
+        '.mp3', '.m4a', '.mp4', '.mkv', '.webm', '.flac', '.ogg',
+        '.oga', '.opus', '.wav', '.aac',
+    }
+    tracks = sorted(
+        (path for path in destination.iterdir() if path.suffix.lower() in media_extensions),
+        key=lambda path: path.name.casefold(),
+    )
+    if not tracks:
+        return None
+    manifest = destination / f"{sanitize_component(playlist_title)}.m3u8"
+    content = '#EXTM3U\n' + ''.join(f"{path.name}\n" for path in tracks)
+    manifest.write_text(content, encoding='utf-8-sig')
+    return manifest
 
 
 def safe_format(template, metadata, default='Unknown'):
@@ -1697,6 +2136,20 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
     output_path = Path(config.get('download_path', Path.home()))
     try:
         apply_queue_control(queue_id)
+        # Flat playlist extraction is intentionally fast but often lacks the
+        # authoritative release year/album. Resolve the individual item before
+        # choosing its folder so the path and the final embedded tags agree.
+        if config.get('smart_organize', True) or config.get('auto_metadata', True):
+            preflight_info = extract_url_info(url, url_type='video', timeout=20)
+            if preflight_info:
+                metadata = merge_ytdlp_metadata(metadata, preflight_info)
+            if config.get('auto_metadata', True):
+                metadata = apply_automatic_metadata_enrichment(
+                    metadata,
+                    config,
+                    detailed=False,
+                )
+            metadata = apply_configured_metadata_overrides(metadata, config)
         output_path, filename_format = build_output_paths(metadata, config)
         if queue_id in DOWNLOAD_QUEUE:
             DOWNLOAD_QUEUE[queue_id]['destination'] = str(output_path)
@@ -1752,7 +2205,9 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
             player_clients = ['default', 'web_music'] if 'music.youtube.com' in url.lower() else ['default']
 
         ydl_opts = {
-            'writethumbnail': True,
+            # El thumbnail de video suele ser 16:9 y puede traer relleno a los
+            # lados. El cover musical se resuelve y normaliza despues.
+            'writethumbnail': False,
             'outtmpl': output_template,
             'quiet': False,
             'noplaylist': True,
@@ -1826,11 +2281,6 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': config['audio_format'],
                     'preferredquality': config['audio_quality'],
-                }, {
-                    'key': 'FFmpegThumbnailsConvertor',
-                    'format': 'jpg',
-                }, {
-                    'key': 'EmbedThumbnail',
                 }],
             })
 
@@ -1867,17 +2317,28 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
             media_file_path = downloaded_files[0]
             if config.get('embed_extended_metadata', True):
                 metadata = merge_ytdlp_metadata(metadata, download_info)
-            if (
-                download_mode != 'video'
-                and config.get('auto_metadata', True)
-                and 'musicbrainz' in config.get('metadata_sources', [])
-            ):
-                metadata = enrich_with_musicbrainz(metadata)
+            if download_mode != 'video' and config.get('auto_metadata', True):
+                metadata = apply_automatic_metadata_enrichment(
+                    metadata,
+                    config,
+                    audio_path=media_file_path,
+                    detailed=True,
+                )
+            metadata = apply_configured_metadata_overrides(metadata, config)
             metadata = apply_metadata_defaults(
                 metadata,
                 config.get('metadata_defaults'),
                 source_url=url,
             )
+
+            media_file_path, output_path, filename_format = relocate_downloaded_family(
+                media_file_path,
+                metadata,
+                config,
+            )
+            downloaded_files[0] = media_file_path
+            if queue_id in DOWNLOAD_QUEUE:
+                DOWNLOAD_QUEUE[queue_id]['destination'] = str(output_path)
 
             if download_mode != 'video' or media_file_path.suffix.lower() == '.mp4':
                 apply_metadata(str(media_file_path), metadata)
@@ -1886,7 +2347,10 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
             audio_file = downloaded_files[0]
 
             if config.get('download_covers'):
-                download_and_apply_cover(str(audio_file), metadata)
+                cover_metadata = download_and_apply_cover(str(audio_file), metadata)
+                if cover_metadata:
+                    metadata.update(cover_metadata)
+                    apply_metadata(str(audio_file), metadata)
 
             if config.get('embed_lyrics', True):
                 # 1) intenta captions directos de YouTube sin romper la descarga principal
@@ -2038,100 +2502,110 @@ def apply_metadata(file_path, metadata):
         logging.warning(f"Error aplicando metadatos: {e}")
 
 
-def download_and_apply_cover(file_path, metadata):
+def _download_cover_candidate(url, source):
+    if not url:
+        return None
     try:
-        artist = metadata.get('artist', '')
-        album = metadata.get('album', '')
+        cover_bytes, width, height = download_square_cover(url)
+        return cover_bytes, {
+            'cover_source': source,
+            'cover_source_url': url,
+            'cover_width': width,
+            'cover_height': height,
+        }
+    except Exception as exc:
+        LOGGER.debug("Cover %s descartado: %s", source, exc)
+        return None
 
-        if not artist or not album:
-            return
 
-        cover_bytes = None
+def _deezer_cover_url(artist, album):
+    try:
+        response = requests.get(
+            'https://api.deezer.com/search/album',
+            params={'q': f'artist:"{artist}" album:"{album}"'},
+            timeout=10,
+        )
+        response.raise_for_status()
+        candidates = response.json().get('data') or []
+        wanted_artist = normalized_identity(artist)
+        wanted_album = normalized_identity(album)
 
-        # Fuente 1: MusicBrainz + CoverArtArchive
+        def match_score(item):
+            found_artist = normalized_identity((item.get('artist') or {}).get('name'))
+            found_album = normalized_identity(item.get('title'))
+            album_score = 3 if found_album == wanted_album else 1 if wanted_album in found_album else 0
+            artist_score = 2 if found_artist == wanted_artist else 1 if wanted_artist in found_artist else 0
+            return album_score + artist_score
+
+        ranked = sorted(candidates, key=match_score, reverse=True)
+        if not ranked or match_score(ranked[0]) < 4:
+            return ''
+        item = ranked[0]
+        return item.get('cover_xl') or item.get('cover_big') or item.get('cover_medium') or ''
+    except Exception as exc:
+        LOGGER.debug("Busqueda de cover en Deezer sin coincidencia: %s", exc)
+        return ''
+
+
+def resolve_cover_art(metadata):
+    artist = clean_artist(metadata.get('album_artist') or metadata.get('artist') or '')
+    album = clean_album(metadata.get('album') or '')
+    collection_kind = str(metadata.get('collection_kind') or '')
+    playlist_cover = str(metadata.get('playlist_cover_url') or '')
+    track_thumbnail = str(metadata.get('thumbnail_url') or '')
+
+    # Un album oficial de YouTube Music publica un thumbnail de playlist
+    # cuadrado de hasta 1200x1200: es la fuente mas fiel a lo que ve el usuario.
+    if collection_kind == 'official_album':
+        result = _download_cover_candidate(playlist_cover, 'youtube_music_album')
+        if result:
+            return result
+
+    if artist and album:
         try:
             search = musicbrainzngs.search_releases(
                 query=f'artist:"{artist}" release:"{album}"',
-                limit=1
+                limit=3,
             )
-
-            if search.get('release-list'):
-                release_id = search['release-list'][0]['id']
-                cover_url = f"https://coverartarchive.org/release/{release_id}/front"
-                response = requests.get(cover_url, timeout=10)
-                if response.status_code == 200:
-                    cover_bytes = response.content
-        except Exception:
-            pass
-
-        # Fuente 2: Deezer (fallback sin autenticacion)
-        if cover_bytes is None:
-            try:
-                query = f'artist:"{artist}" album:"{album}"'
-                response = requests.get(
-                    'https://api.deezer.com/search/album',
-                    params={'q': query},
-                    timeout=10
+            for release in search.get('release-list') or []:
+                if not musicbrainz_release_matches(release, artist, album):
+                    continue
+                release_id = release.get('id')
+                if not release_id:
+                    continue
+                result = _download_cover_candidate(
+                    f"https://coverartarchive.org/release/{release_id}/front",
+                    'cover_art_archive',
                 )
-                if response.status_code == 200:
-                    payload = response.json()
-                    albums = payload.get('data') or []
-                    if albums:
-                        image_url = albums[0].get('cover_xl') or albums[0].get('cover_big') or albums[0].get('cover_medium')
-                        if image_url:
-                            img_response = requests.get(image_url, timeout=10)
-                            if img_response.status_code == 200:
-                                cover_bytes = img_response.content
-            except Exception:
-                pass
+                if result:
+                    return result
+        except Exception as exc:
+            LOGGER.debug("Cover Art Archive sin coincidencia: %s", exc)
 
-        if cover_bytes and not has_embedded_cover(file_path):
-            embed_cover(file_path, cover_bytes, mime='image/jpeg')
+        deezer_url = _deezer_cover_url(artist, album)
+        result = _download_cover_candidate(deezer_url, 'deezer_album')
+        if result:
+            return result
 
-    except Exception:
-        pass
+    # Para playlists personales se conserva su artwork como respaldo. La
+    # miniatura 16:9 del video es el ultimo recurso y se recorta al centro.
+    result = _download_cover_candidate(playlist_cover, 'youtube_music_playlist')
+    if result:
+        return result
+    return _download_cover_candidate(track_thumbnail, 'youtube_thumbnail_cropped')
 
 
-def has_embedded_cover(file_path):
+def download_and_apply_cover(file_path, metadata):
     try:
-        suffix = Path(file_path).suffix.lower()
-        if suffix == '.mp3':
-            try:
-                tags = ID3(file_path)
-            except ID3NoHeaderError:
-                return False
-            return bool(tags.getall('APIC'))
-        if suffix in ('.m4a', '.mp4'):
-            audio = MP4(file_path)
-            return bool(audio.tags and audio.tags.get('covr'))
-        return False
-    except Exception:
-        return False
-
-
-def embed_cover(file_path, cover_bytes, mime='image/jpeg'):
-    suffix = Path(file_path).suffix.lower()
-    if suffix == '.mp3':
-        try:
-            tags = ID3(file_path)
-        except ID3NoHeaderError:
-            tags = ID3()
-        tags.delall('APIC')
-        tags.add(APIC(
-            encoding=3,
-            mime=mime,
-            type=3,
-            desc='Cover',
-            data=cover_bytes
-        ))
-        tags.save(file_path, v2_version=4)
-        return
-
-    if suffix in ('.m4a', '.mp4'):
-        audio = MP4(file_path)
-        img_fmt = MP4Cover.FORMAT_JPEG if mime == 'image/jpeg' else MP4Cover.FORMAT_PNG
-        audio['covr'] = [MP4Cover(cover_bytes, imageformat=img_fmt)]
-        audio.save()
+        resolved = resolve_cover_art(metadata)
+        if not resolved:
+            return {}
+        cover_bytes, cover_metadata = resolved
+        write_cover(file_path, cover_bytes)
+        return cover_metadata
+    except Exception as exc:
+        LOGGER.warning("No se pudo aplicar un cover de calidad a %s: %s", file_path, exc)
+        return {}
 
 
 @app.route('/api/status/<int:queue_id>')
@@ -2149,6 +2623,82 @@ def get_queue():
         reverse=True
     )
     return jsonify(items)
+
+
+@app.route('/api/batch-queue', methods=['GET', 'POST'])
+def batch_queue_api():
+    if request.method == 'GET':
+        jobs = load_batch_jobs()
+        if any(item.get('status') in {'pending', 'starting', 'running'} for item in jobs):
+            ensure_batch_dispatcher()
+            BATCH_WAKE.set()
+        return jsonify([public_batch_job(item) for item in jobs[-100:]])
+
+    payload = request.json or {}
+    jobs = payload.get('jobs') or []
+    if not isinstance(jobs, list) or not jobs:
+        return jsonify({'error': 'Se requiere al menos una tarea'}), 400
+    if len(jobs) > 50:
+        return jsonify({'error': 'El maximo es 50 tareas por lote'}), 400
+
+    valid = []
+    for item in jobs:
+        if not isinstance(item, dict):
+            continue
+        kind = (item.get('kind') or 'single').strip().lower()
+        job_payload = item.get('payload') or {}
+        if kind not in {'single', 'playlist'} or not isinstance(job_payload, dict):
+            continue
+        if not job_payload.get('url') and not job_payload.get('selected_items'):
+            continue
+        valid.append({'kind': kind, 'label': item.get('label'), 'payload': job_payload})
+    if not valid:
+        return jsonify({'error': 'No se encontraron tareas validas'}), 400
+
+    created = enqueue_batch_jobs(valid)
+    return jsonify({
+        'status': 'ok',
+        'created': len(created),
+        'duplicates': len(valid) - len(created),
+        'jobs': created,
+    })
+
+
+@app.route('/api/batch-queue/<job_id>/control', methods=['POST'])
+def control_batch_queue(job_id):
+    action = ((request.json or {}).get('action') or '').strip().lower()
+    load_batch_jobs()
+    with BATCH_LOCK:
+        job = next((item for item in BATCH_JOBS if item.get('job_id') == job_id), None)
+        if not job:
+            return jsonify({'error': 'Tarea persistente no encontrada'}), 404
+
+        if action == 'cancel':
+            queue = DOWNLOAD_QUEUE.get(job.get('queue_id'))
+            if queue and is_active_queue_status(queue.get('status')):
+                queue['cancel_requested'] = True
+                queue['pause_requested'] = False
+            job['status'] = 'cancelled'
+            job['message'] = 'Cancelada por el usuario'
+        elif action == 'retry' and job.get('status') in {'error', 'cancelled'}:
+            job['status'] = 'pending'
+            job['progress'] = 0
+            job['queue_id'] = None
+            job['message'] = 'Lista para reintentar'
+        elif action == 'remove' and job.get('status') not in {'starting', 'running'}:
+            BATCH_JOBS.remove(job)
+            save_batch_jobs_locked()
+            return jsonify({'status': 'ok', 'action': action, 'job_id': job_id})
+        else:
+            return jsonify({'error': 'Accion no permitida para el estado actual'}), 400
+
+        job['updated_at'] = datetime.now().isoformat(timespec='seconds')
+        save_batch_jobs_locked()
+
+    if action == 'retry':
+        ensure_batch_dispatcher()
+        BATCH_WAKE.set()
+    return jsonify({'status': 'ok', 'action': action, 'job': public_batch_job(job)})
 
 
 @app.route('/api/queue/<int:queue_id>/control', methods=['POST'])
@@ -2240,7 +2790,10 @@ def has_active_downloads():
     for queue in DOWNLOAD_QUEUE.values():
         if queue.get('status') in active_states:
             return True
-    return False
+    return any(
+        item.get('status') in {'pending', 'starting', 'running'}
+        for item in load_batch_jobs()
+    )
 
 
 @app.route('/api/history/clear', methods=['POST'])
@@ -2260,6 +2813,165 @@ def clear_archive():
     archive_file.parent.mkdir(parents=True, exist_ok=True)
     archive_file.write_text('', encoding='utf-8')
     return jsonify({'status': 'ok', 'cleared': 'archive', 'archive_file': str(archive_file)})
+
+
+def _cover_repair_music_tags(path):
+    try:
+        audio = MutagenFile(path, easy=True)
+        tags = audio.tags if audio is not None else {}
+
+        def first(*keys):
+            for key in keys:
+                value = tags.get(key) if tags else None
+                if isinstance(value, (list, tuple)) and value:
+                    value = value[0]
+                if value not in (None, ''):
+                    return str(value)
+            return ''
+
+        return {
+            'artist': first('artist'),
+            'album_artist': first('albumartist', 'album artist'),
+            'album': first('album'),
+        }
+    except Exception:
+        return {}
+
+
+def cover_repair_worker(library_root):
+    audio_extensions = {'.mp3', '.m4a', '.flac', '.ogg', '.oga', '.opus', '.wav'}
+    try:
+        groups = {}
+        for path in Path(library_root).rglob('*'):
+            if not path.is_file() or path.suffix.lower() not in audio_extensions:
+                continue
+            metadata = _cover_repair_music_tags(path)
+            artist = clean_artist(metadata.get('album_artist') or metadata.get('artist') or '')
+            album = clean_album(metadata.get('album') or '')
+            if not artist or not album or artist == 'Unknown' or album == 'Unknown':
+                continue
+            key = (normalized_identity(artist), normalized_identity(album))
+            group = groups.setdefault(key, {'artist': artist, 'album': album, 'files': []})
+            group['files'].append(path)
+
+        with COVER_REPAIR_LOCK:
+            COVER_REPAIR_STATE.update({
+                'status': 'running',
+                'processed_albums': 0,
+                'total_albums': len(groups),
+                'updated_files': 0,
+                'failed_albums': 0,
+                'message': 'Buscando covers cuadrados de alta calidad...',
+            })
+
+        for index, group in enumerate(groups.values(), 1):
+            resolved = resolve_cover_art(group)
+            updated = 0
+            if resolved:
+                cover_bytes, _cover_metadata = resolved
+                for path in group['files']:
+                    try:
+                        write_cover(path, cover_bytes)
+                        updated += 1
+                    except Exception as exc:
+                        LOGGER.warning("No se pudo reparar cover en %s: %s", path, exc)
+            with COVER_REPAIR_LOCK:
+                COVER_REPAIR_STATE['processed_albums'] = index
+                COVER_REPAIR_STATE['updated_files'] += updated
+                COVER_REPAIR_STATE['failed_albums'] += 0 if resolved else 1
+                COVER_REPAIR_STATE['message'] = f"{group['artist']} - {group['album']}"
+
+        with COVER_REPAIR_LOCK:
+            COVER_REPAIR_STATE['status'] = 'completed'
+            COVER_REPAIR_STATE['message'] = (
+                f"Covers actualizados en {COVER_REPAIR_STATE['updated_files']} archivos."
+            )
+    except Exception as exc:
+        LOGGER.exception("Fallo la reparacion de covers")
+        with COVER_REPAIR_LOCK:
+            COVER_REPAIR_STATE.update({'status': 'error', 'message': str(exc)})
+
+
+@app.route('/api/maintenance/repair-covers', methods=['GET', 'POST'])
+def repair_covers():
+    if request.method == 'GET':
+        with COVER_REPAIR_LOCK:
+            return jsonify(dict(COVER_REPAIR_STATE))
+    if has_active_downloads():
+        return jsonify({'error': 'Espera a que terminen las descargas antes de reparar covers.'}), 409
+    with COVER_REPAIR_LOCK:
+        if COVER_REPAIR_STATE.get('status') == 'running':
+            return jsonify(dict(COVER_REPAIR_STATE)), 202
+        COVER_REPAIR_STATE.update({'status': 'starting', 'message': 'Analizando biblioteca...'})
+    library_root = Path(load_config().get('download_path') or DEFAULT_CONFIG['download_path']).expanduser()
+    thread = threading.Thread(target=cover_repair_worker, args=(library_root,), daemon=True)
+    thread.start()
+    return jsonify({'status': 'starting', 'root': str(library_root)}), 202
+
+
+def metadata_repair_worker(library_root, *, apply=False, enrich=True, analyze_audio=False):
+    try:
+        ffmpeg_executable = 'ffmpeg'
+        if FFMPEG_PATH:
+            candidate = Path(FFMPEG_PATH)
+            ffmpeg_executable = str(candidate / 'ffmpeg.exe') if candidate.is_dir() else str(candidate)
+        result = repair_media_library(
+            library_root,
+            apply=apply,
+            enrich=enrich,
+            analyze_audio=analyze_audio,
+            ffmpeg_path=ffmpeg_executable,
+        )
+        with METADATA_REPAIR_LOCK:
+            METADATA_REPAIR_STATE.update({
+                'status': result.get('status', 'completed'),
+                'mode': result.get('mode', 'apply' if apply else 'dry-run'),
+                'summary': result.get('summary') or {},
+                'journal_path': result.get('journal_path', ''),
+                'message': (
+                    'Reparación aplicada con respaldo y journal.'
+                    if apply else 'Simulación lista; revisa el resumen antes de aplicar.'
+                ),
+            })
+    except Exception as exc:
+        LOGGER.exception("Falló la reparación de metadatos")
+        with METADATA_REPAIR_LOCK:
+            METADATA_REPAIR_STATE.update({'status': 'error', 'message': str(exc)})
+
+
+@app.route('/api/maintenance/repair-metadata', methods=['GET', 'POST'])
+def repair_metadata_library():
+    if request.method == 'GET':
+        with METADATA_REPAIR_LOCK:
+            return jsonify(dict(METADATA_REPAIR_STATE))
+    if has_active_downloads():
+        return jsonify({'error': 'Espera a que terminen las descargas antes de reorganizar.'}), 409
+    payload = request.get_json(silent=True) or {}
+    apply_changes = bool(payload.get('apply'))
+    enrich = payload.get('enrich') is not False
+    analyze_audio = bool(payload.get('analyze_audio'))
+    with METADATA_REPAIR_LOCK:
+        if METADATA_REPAIR_STATE.get('status') in {'starting', 'running'}:
+            return jsonify(dict(METADATA_REPAIR_STATE)), 202
+        METADATA_REPAIR_STATE.update({
+            'status': 'starting',
+            'mode': 'apply' if apply_changes else 'dry-run',
+            'summary': {},
+            'message': 'Analizando biblioteca y fuentes verificables...',
+        })
+    library_root = Path(load_config().get('download_path') or DEFAULT_CONFIG['download_path']).expanduser()
+    thread = threading.Thread(
+        target=metadata_repair_worker,
+        args=(library_root,),
+        kwargs={
+            'apply': apply_changes,
+            'enrich': enrich,
+            'analyze_audio': analyze_audio,
+        },
+        daemon=True,
+    )
+    thread.start()
+    return jsonify({'status': 'starting', 'root': str(library_root)}), 202
 
 
 @app.route('/api/maintenance/clear-all', methods=['POST'])

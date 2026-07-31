@@ -1,0 +1,31 @@
+name: publish-release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Verify tag matches application version
+        run: >-
+          python -c "import os; from ymd.version import RELEASE_TAG;
+          tag=os.environ['GITHUB_REF_NAME'];
+          assert tag == RELEASE_TAG, f'El tag {tag} no coincide con {RELEASE_TAG}'"
+      - run: python -m unittest discover -s tests -v
+      - run: ruff check app_playlist.py ymd tests
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

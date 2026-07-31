@@ -7,6 +7,21 @@ Windows, Linux y macOS, pero v0.012 se valida primero en Windows. La UI web ya
 separa parcialmente cliente, biblioteca y servicios, lo que reduce el trabajo
 para nuevos frontends.
 
+### Base preparada en la aplicación web
+
+- `static/manifest.webmanifest`: instalación como PWA.
+- `service-worker.js`: notificaciones persistentes y retorno a la actividad de descargas.
+- `static/js/app-shell.js`: permiso explícito, deduplicación y política de
+  silencio durante la reproducción.
+- Media Session: metadatos y controles del sistema para audio local.
+- Cola persistente del backend: el trabajo largo no depende de mantener una
+  página abierta.
+
+En el entorno Windows actual están disponibles Node.js 24 y npm 11. El JDK,
+Android SDK/Android Studio y `adb` todavía no están instalados. iOS requiere un
+equipo macOS con Xcode para compilar, firmar y probar; no se puede completar esa
+cadena desde Windows.
+
 ## Arquitectura objetivo
 
 ```mermaid
@@ -41,6 +56,12 @@ no soporte.
 - Usar almacenamiento con alcance, selector de documentos, notificaciones y
   servicio en primer plano para tareas largas.
 - Nunca solicitar permisos generales de archivos si un permiso acotado basta.
+
+Para el cliente futuro se recomienda Capacitor sobre un frontend web estático
+separado. No se debe apuntar `webDir` directamente a las plantillas Jinja: hoy
+dependen del servidor Flask y de rutas relativas `/api/*`. Primero se extraerá
+un cliente consumiendo la API versionada; después se añadirán las plataformas
+Android/iOS y los plugins nativos de notificaciones y almacenamiento.
 
 ### iOS/iPadOS
 

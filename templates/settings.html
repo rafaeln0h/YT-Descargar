@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='icons/ymd.svg') }}" type="image/svg+xml">
     <title>Configuracion - YT-Descargar</title>
+    <meta name="theme-color" content="#09090b">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css') }}">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -212,20 +216,29 @@
             .topbar { flex-direction: column; align-items: flex-start; }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ytm-theme.css') }}">
 </head>
-<body>
+<body class="ymd-app-page ymd-settings-page">
     <div class="container">
         <div class="topbar">
             <div>
+                <span class="ymd-brand-kicker">Centro de control</span>
                 <h1>Configuracion</h1>
-                <p class="muted">Ajusta el motor de descarga, el comportamiento de `yt-dlp` y el etiquetado inteligente para listas, albumes y canciones.</p>
+                <p class="muted">Personaliza calidad, biblioteca, metadatos, covers y conexiones sin perder el contexto.</p>
             </div>
             <div class="actions" style="margin-top:0;">
-                <a href="/suite" class="btn btn-secondary">Suite</a>
                 <a href="/" class="btn btn-primary">Volver al descargador</a>
             </div>
         </div>
 
+        <nav class="ymd-primary-tabs" data-ymd-tablist="settings" aria-label="Secciones de configuración">
+            <button class="is-active" type="button" data-ymd-tab="general" aria-selected="true">Audio y rutas</button>
+            <button type="button" data-ymd-tab="metadata" aria-selected="false">Metadatos</button>
+            <button type="button" data-ymd-tab="engine" aria-selected="false">Motor</button>
+            <button type="button" data-ymd-tab="system" aria-selected="false">Sistema</button>
+        </nav>
+
+        <section class="ymd-page-panel is-active" data-ymd-panel="general">
         <div class="card">
             <h2>Audio y Organizacion</h2>
             <p class="section-copy">Estas opciones afectan el formato principal, calidad y estructura de guardado de tus descargas.</p>
@@ -291,13 +304,14 @@
 
                     <div class="form-group">
                         <label class="form-label">Carpeta</label>
-                        <input type="text" id="folderStructure" class="form-input" value="{artist}/{year} - {album}">
+                        <input type="text" id="folderStructure" class="form-input" value="{album_artist}/{year} - {album}">
                         <div class="hint">Plantilla base para canciones individuales o cuando la playlist usa modo heredado.</div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label">Organizacion de playlists</label>
                         <select id="playlistFolderMode" class="form-select">
+                            <option value="smart">Inteligente: album oficial o carpeta por playlist</option>
                             <option value="inherit">Heredar plantilla base</option>
                             <option value="one_folder">Todo en una carpeta por playlist</option>
                             <option value="playlist_artist_album">Playlist / artista / album</option>
@@ -317,7 +331,13 @@
 
                     <div class="form-group">
                         <label class="form-label">Nombre archivo</label>
-                        <input type="text" id="filenameFormat" class="form-input" value="{track:02d} - {title}">
+                        <input type="text" id="filenameFormat" class="form-input" value="{track:02d} {title}">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nombre de archivo dentro de playlists</label>
+                        <input type="text" id="playlistFilenameFormat" class="form-input" value="{playlist_track:02d} - {title}">
+                        <div class="hint">El modo inteligente usa este formato solo en playlists normales; los albumes oficiales conservan el formato anterior.</div>
                     </div>
 
                     <div class="preview-box">
@@ -329,7 +349,9 @@
                 </div>
             </div>
         </div>
+        </section>
 
+        <section class="ymd-page-panel" data-ymd-panel="metadata" hidden>
         <div class="card">
             <h2>Etiquetado Inteligente de Playlists</h2>
             <p class="section-copy">Define como quieres que se escriban las etiquetas de una playlist cuando el contenido mezcla canciones sueltas, albumes y artistas distintos.</p>
@@ -358,6 +380,7 @@
                     <div class="form-group">
                         <label class="form-label">Album artist</label>
                         <select id="playlistTagAlbumArtistMode" class="form-select">
+                            <option value="smart">Inteligente: artista real o Various Artists</option>
                             <option value="playlist_owner">Artista/canal de la playlist</option>
                             <option value="track_artist">Copiar el artista de la pista</option>
                             <option value="various_artists">Various Artists</option>
@@ -370,6 +393,7 @@
                     <div class="form-group">
                         <label class="form-label">Numeracion de pistas</label>
                         <select id="playlistTrackNumberMode" class="form-select">
+                            <option value="smart">Inteligente: orden playlist o pista real del album</option>
                             <option value="album">Reiniciar por album</option>
                             <option value="playlist">Seguir el orden global de la playlist</option>
                         </select>
@@ -476,7 +500,9 @@
                 </label>
             </div>
         </div>
+        </section>
 
+        <section class="ymd-page-panel" data-ymd-panel="engine" hidden>
         <div class="card">
             <h2>Motor yt-dlp</h2>
             <p class="section-copy">Ajustes avanzados para estabilidad, autenticacion y comportamiento del extractor de YouTube/YouTube Music.</p>
@@ -543,19 +569,43 @@
                 </div>
             </div>
         </div>
+        </section>
+
+        <section class="ymd-page-panel" data-ymd-panel="system" hidden>
+        <div class="card">
+            <h2>Actualizaciones desde GitHub</h2>
+            <p class="section-copy">Repositorio conectado: <a href="https://github.com/rafaeln0h/YT-Descargar" target="_blank" rel="noopener noreferrer">rafaeln0h/YT-Descargar</a>. Los avisos se activan solo con Releases publicadas, nunca con commits incompletos.</p>
+            <label class="inline-check">
+                <input type="checkbox" id="checkForUpdates" checked>
+                <span>Comprobar actualizaciones estables y mostrar una recomendacion discreta</span>
+            </label>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn btn-secondary" type="button" onclick="checkUpdateNow()">Comprobar ahora</button>
+            </div>
+        </div>
 
         <div class="card">
             <h2>Mantenimiento</h2>
             <p class="section-copy">Si borraste archivos manualmente y la app dice que ya estaban descargados, usa estas acciones para desbloquear nuevas descargas.</p>
             <div class="actions">
+                <button class="btn btn-primary" type="button" onclick="repairLibraryMetadata(false)">Analizar organización y tags</button>
+                <button class="btn btn-secondary" type="button" onclick="repairLibraryMetadata(true)">Aplicar reparación de carpetas y tags</button>
+                <button class="btn btn-primary" type="button" onclick="repairLibraryCovers()">Reparar covers de la biblioteca</button>
                 <button class="btn btn-secondary" onclick="clearArchiveOnly()">Permitir redescarga (limpiar archivo de descargas)</button>
                 <button class="btn btn-secondary" onclick="clearHistoryOnly()">Limpiar historial de la app</button>
                 <button class="btn btn-secondary" onclick="clearAllMaintenance()">Limpiar todo (historial + archivo de descargas)</button>
                 <button class="btn btn-secondary" onclick="removeLegacyMetadataJson()">Eliminar JSON de metadatos antiguos</button>
             </div>
+            <label class="inline-check" style="margin-top:12px;">
+                <input type="checkbox" id="analyzeAudioLoudness">
+                <span>Calcular loudness y ReplayGain al aplicar (más lento, no altera el audio)</span>
+            </label>
+            <div class="hint" id="metadataRepairStatus">Primero ejecuta la simulación. Cada aplicación crea respaldos y un journal reversible.</div>
+            <div class="hint" id="coverRepairStatus">Reemplaza thumbnails de video por covers cuadrados de álbum cuando existe una coincidencia confiable.</div>
         </div>
+        </section>
 
-        <div class="card">
+        <div class="card ymd-save-dock">
             <h2>Guardar</h2>
             <div class="actions">
                 <button class="btn btn-primary" onclick="saveConfig()">Guardar configuracion</button>
@@ -570,6 +620,7 @@
     <script>
         let cachedConfig = null;
         const playlistFolderPresets = {
+            smart: 'Playlists/{playlist_title}',
             inherit: '',
             one_folder: 'Playlists/{playlist_title}',
             playlist_artist_album: 'Playlists/{playlist_title}/{artist}/{year} - {album}',
@@ -613,15 +664,16 @@
             document.getElementById('embedLyrics').checked = config.embed_lyrics !== false;
             document.getElementById('embedExtendedMetadata').checked = config.embed_extended_metadata !== false;
             document.getElementById('downloadPath').value = config.download_path || '';
-            document.getElementById('folderStructure').value = config.folder_structure || '{artist}/{year} - {album}';
-            document.getElementById('playlistFolderMode').value = config.playlist_folder_mode || 'inherit';
+            document.getElementById('folderStructure').value = config.folder_structure || '{album_artist}/{year} - {album}';
+            document.getElementById('playlistFolderMode').value = config.playlist_folder_mode || 'smart';
             document.getElementById('playlistFolderTemplate').value = config.playlist_folder_template || '';
-            document.getElementById('filenameFormat').value = config.filename_format || '{track:02d} - {title}';
+            document.getElementById('filenameFormat').value = config.filename_format || '{track:02d} {title}';
+            document.getElementById('playlistFilenameFormat').value = config.playlist_filename_format || '{playlist_track:02d} - {title}';
 
             document.getElementById('playlistTagAlbumMode').value = config.playlist_tag_album_mode || 'smart';
             document.getElementById('playlistTagArtistMode').value = config.playlist_tag_artist_mode || 'detected';
-            document.getElementById('playlistTagAlbumArtistMode').value = config.playlist_tag_album_artist_mode || 'playlist_owner';
-            document.getElementById('playlistTrackNumberMode').value = config.playlist_track_number_mode || 'album';
+            document.getElementById('playlistTagAlbumArtistMode').value = config.playlist_tag_album_artist_mode || 'smart';
+            document.getElementById('playlistTrackNumberMode').value = config.playlist_track_number_mode || 'smart';
             document.getElementById('playlistTagGenreMode').value = config.playlist_tag_genre_mode || 'empty';
             document.getElementById('playlistDefaultGenre').value = config.playlist_default_genre || '';
             const metadata = config.metadata_defaults || {};
@@ -655,6 +707,7 @@
             document.getElementById('concurrentFragments').value = config.concurrent_fragments ?? 1;
             document.getElementById('sleepInterval').value = config.sleep_interval ?? 0;
             document.getElementById('maxSleepInterval').value = config.max_sleep_interval ?? 0;
+            document.getElementById('checkForUpdates').checked = config.check_for_updates !== false;
             updatePlaylistTemplateState();
             updateStructurePreview();
         }
@@ -672,6 +725,7 @@
                 playlist_folder_mode: document.getElementById('playlistFolderMode').value,
                 playlist_folder_template: document.getElementById('playlistFolderTemplate').value,
                 filename_format: document.getElementById('filenameFormat').value,
+                playlist_filename_format: document.getElementById('playlistFilenameFormat').value,
 
                 playlist_tag_album_mode: document.getElementById('playlistTagAlbumMode').value,
                 playlist_tag_artist_mode: document.getElementById('playlistTagArtistMode').value,
@@ -710,8 +764,83 @@
                 fragment_retries: Number(document.getElementById('fragmentRetries').value || 10),
                 concurrent_fragments: Number(document.getElementById('concurrentFragments').value || 1),
                 sleep_interval: Number(document.getElementById('sleepInterval').value || 0),
-                max_sleep_interval: Number(document.getElementById('maxSleepInterval').value || 0)
+                max_sleep_interval: Number(document.getElementById('maxSleepInterval').value || 0),
+                check_for_updates: document.getElementById('checkForUpdates').checked
             };
+        }
+
+        async function checkUpdateNow() {
+            showStatus('Consultando la ultima Release de GitHub...');
+            try {
+                const res = await fetch('/api/system/update?force=1', { cache: 'no-store' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                if (data.update_available) {
+                    showStatus(`Actualizacion ${data.latest_release?.tag || ''} disponible. Abre el aviso para revisar los cambios.`);
+                } else if (data.status === 'no_release') {
+                    showStatus('El repositorio aun no tiene una Release publicada. La conexion funciona.');
+                } else {
+                    showStatus(`Estas al dia con la version ${data.current_version}.`);
+                }
+            } catch (e) {
+                showStatus(`No se pudo comprobar GitHub: ${e.message}`, true);
+            }
+        }
+
+        async function repairLibraryCovers() {
+            const status = document.getElementById('coverRepairStatus');
+            status.textContent = 'Iniciando análisis de covers...';
+            try {
+                const start = await fetch('/api/maintenance/repair-covers', { method: 'POST' });
+                const initial = await start.json();
+                if (!start.ok && start.status !== 202) throw new Error(initial.error || `HTTP ${start.status}`);
+                const poll = async () => {
+                    const response = await fetch('/api/maintenance/repair-covers', { cache: 'no-store' });
+                    const data = await response.json();
+                    status.textContent = data.status === 'running'
+                        ? `${data.processed_albums}/${data.total_albums} álbumes · ${data.updated_files} archivos · ${data.message}`
+                        : data.message || 'Reparación finalizada.';
+                    if (['starting', 'running'].includes(data.status)) window.setTimeout(poll, 1500);
+                    else if (data.status === 'completed') window.YMDApp?.toast(data.message, 'success');
+                    else if (data.status === 'error') window.YMDApp?.toast(data.message, 'error');
+                };
+                window.setTimeout(poll, 500);
+            } catch (error) {
+                status.textContent = `No se pudo reparar: ${error.message}`;
+                window.YMDApp?.toast(status.textContent, 'error');
+            }
+        }
+
+        async function repairLibraryMetadata(applyChanges) {
+            if (applyChanges && !window.confirm('Se moverán y reetiquetarán archivos con respaldo reversible. ¿Continuar?')) return;
+            const status = document.getElementById('metadataRepairStatus');
+            status.textContent = applyChanges ? 'Aplicando reparación segura...' : 'Preparando simulación...';
+            try {
+                const response = await fetch('/api/maintenance/repair-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        apply: applyChanges,
+                        enrich: true,
+                        analyze_audio: applyChanges && document.getElementById('analyzeAudioLoudness').checked
+                    })
+                });
+                const initial = await response.json();
+                if (!response.ok && response.status !== 202) throw new Error(initial.error || `HTTP ${response.status}`);
+                const poll = async () => {
+                    const check = await fetch('/api/maintenance/repair-metadata', { cache: 'no-store' });
+                    const data = await check.json();
+                    const summary = data.summary || {};
+                    status.textContent = `${data.message || data.status} Total: ${summary.total || 0}; completados: ${summary.completed || 0}; colisiones: ${summary.collision || 0}. ${data.journal_path || ''}`;
+                    if (['starting', 'running'].includes(data.status)) window.setTimeout(poll, 1500);
+                    else if (data.status === 'error') window.YMDApp?.toast(data.message, 'error');
+                    else window.YMDApp?.toast(data.message, 'success');
+                };
+                window.setTimeout(poll, 600);
+            } catch (error) {
+                status.textContent = `No se pudo reparar: ${error.message}`;
+                window.YMDApp?.toast(status.textContent, 'error');
+            }
         }
 
         function padNumber(value, size) {
@@ -749,10 +878,11 @@
             const folderSingle = applyTemplate(form.folder_structure, previewSample, '{artist}/{year} - {album}');
             const playlistTemplate = getPlaylistTemplate(form);
             const folderPlaylist = applyTemplate(playlistTemplate, previewSample, '{artist}/{year} - {album}');
-            const fileName = applyTemplate(form.filename_format, previewSample, '{track:02d} - {title}');
+            const fileName = applyTemplate(form.filename_format, previewSample, '{track:02d} {title}');
+            const playlistFileName = applyTemplate(form.playlist_filename_format, previewSample, '{playlist_track:02d} - {title}');
 
             document.getElementById('singlePreview').textContent = `Cancion individual -> ${basePath}/${folderSingle}/${fileName}.mp3`;
-            document.getElementById('playlistPreview').textContent = `Desde playlist -> ${basePath}/${folderPlaylist}/${fileName}.mp3`;
+            document.getElementById('playlistPreview').textContent = `Playlist normal -> ${basePath}/${folderPlaylist}/${playlistFileName}.mp3`;
         }
 
         async function openDownloadFolder() {
@@ -895,7 +1025,8 @@
                 'folderStructure',
                 'playlistFolderMode',
                 'playlistFolderTemplate',
-                'filenameFormat'
+                'filenameFormat',
+                'playlistFilenameFormat'
             ];
             ids.forEach((id) => {
                 const el = document.getElementById(id);
@@ -916,5 +1047,6 @@
             loadConfig();
         });
     </script>
+    <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
 </body>
 </html>

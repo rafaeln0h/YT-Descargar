@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YT-Descargar</title>
+    <meta name="theme-color" content="#09090b">
+    <link rel="icon" href="{{ url_for('static', filename='icons/ymd.svg') }}" type="image/svg+xml">
+    <link rel="manifest" href="/static/manifest.webmanifest">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app-shell.css') }}">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
@@ -58,30 +62,6 @@
             gap: 10px;
         }
         .header-copy { text-align: center; flex: 1; }
-        .suite-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 42px;
-            padding: 0 14px;
-            border-radius: 999px;
-            border: 1px solid #ffd5c4;
-            background: rgba(255,255,255,.92);
-            color: #7c2d12;
-            text-decoration: none;
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: .05em;
-            text-transform: uppercase;
-            transition: all .2s ease;
-            white-space: nowrap;
-        }
-        .suite-link:hover {
-            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
-            color: white;
-            border-color: transparent;
-            transform: translateY(-1px);
-        }
         .settings-link {
             display: inline-flex;
             align-items: center;
@@ -1020,28 +1000,33 @@
         }
     </style>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mini-player.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ytm-theme.css') }}">
 </head>
-<body>
+<body class="ymd-app-page">
     <div class="container">
         <div class="header">
             <div class="header-top">
                 <div class="settings-spacer"></div>
                 <div class="header-copy">
+                    <span class="ymd-brand-kicker">Tu música, bajo tu control</span>
                     <h1>YT-Descargar</h1>
-                    <p>Descargas autorizadas, biblioteca local y metadatos trazables en una experiencia accesible</p>
+                    <p>Descarga, organiza y reproduce tu colección con una experiencia inspirada en YouTube Music.</p>
                 </div>
                 <div class="header-actions">
-                    <a class="suite-link" href="/suite">Suite</a>
-                    <a class="settings-link" href="/settings" title="Abrir configuracion" aria-label="Abrir configuracion">
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M10.325 4.317a1 1 0 0 1 .95-.69h1.45a1 1 0 0 1 .95.69l.318.979a1 1 0 0 0 .95.69h1.03a1 1 0 0 1 .832.445l.805 1.2a1 1 0 0 1-.103 1.219l-.734.826a1 1 0 0 0-.22 1.031l.357 1.098a1 1 0 0 0 .95.69h.975a1 1 0 0 1 .95.69l.45 1.384a1 1 0 0 1-.366 1.118l-1.15.836a1 1 0 0 0-.365 1.118l.36 1.11a1 1 0 0 1-.366 1.118l-1.176.854a1 1 0 0 1-1.176 0l-.98-.712a1 1 0 0 0-1.176 0l-.98.712a1 1 0 0 1-1.176 0l-1.176-.854a1 1 0 0 1-.366-1.118l.36-1.11a1 1 0 0 0-.365-1.118l-1.15-.836a1 1 0 0 1-.366-1.118l.45-1.384a1 1 0 0 1 .95-.69h.975a1 1 0 0 0 .95-.69l.357-1.098a1 1 0 0 0-.22-1.031l-.734-.826a1 1 0 0 1-.103-1.219l.805-1.2a1 1 0 0 1 .832-.445h1.03a1 1 0 0 0 .95-.69l.318-.98Z" stroke="currentColor" stroke-width="1.2"/>
-                            <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.2"/>
-                        </svg>
-                    </a>
+                    <button class="ymd-notification-button" type="button" data-enable-notifications>Activar avisos</button>
+                    <a class="settings-link" href="/settings">Ajustes</a>
                 </div>
             </div>
         </div>
 
+        <nav class="ymd-primary-tabs" data-ymd-tablist="main" aria-label="Secciones principales">
+            <button class="is-active" type="button" data-ymd-tab="download" aria-selected="true">Explorar y descargar</button>
+            <button type="button" data-ymd-tab="activity" aria-selected="false">Descargas</button>
+            <button type="button" data-ymd-tab="library" aria-selected="false">Biblioteca</button>
+            <a href="/settings">Configuración</a>
+        </nav>
+
+        <section class="ymd-page-panel is-active" data-ymd-panel="download">
         <div class="grid-2">
             <div class="card">
                 <h2>Ingresa URL</h2>
@@ -1261,6 +1246,7 @@
                         <div class="form-group">
                             <label class="form-label">Organizacion de playlists</label>
                             <select id="playlistFolderMode" class="form-select">
+                                <option value="smart">Inteligente: album oficial o carpeta por playlist</option>
                                 <option value="inherit">Heredar plantilla general</option>
                                 <option value="one_folder">Todo en una sola carpeta por playlist</option>
                                 <option value="playlist_artist_album">Playlist / artista / album</option>
@@ -1300,7 +1286,9 @@
                 </div>
             </div>
         </div>
+        </section>
 
+        <section class="ymd-page-panel" data-ymd-panel="activity" hidden>
         <div class="card">
             <h2>Progreso y Logs</h2>
 
@@ -1341,39 +1329,99 @@
                 <div id="historyList" class="history-list"></div>
             </div>
         </div>
+        </section>
+
+        <section class="ymd-page-panel" data-ymd-panel="library" hidden>
+            <div class="library-app" id="libraryApp" aria-label="Biblioteca musical">
+                <header class="library-app-header">
+                    <div class="library-heading">
+                        <span class="ymd-brand-kicker">Tu colección local</span>
+                        <h2>Biblioteca</h2>
+                        <p id="libraryRoot">Escaneando la carpeta configurada…</p>
+                    </div>
+                    <div class="library-toolbar">
+                        <label class="library-search-wrap">
+                            <span>Buscar</span>
+                            <input class="library-search" id="librarySearch" type="search" placeholder="Canción, artista, álbum o playlist">
+                        </label>
+                        <button class="mini-player-button" id="libraryRefresh" type="button">Reescanear carpeta</button>
+                    </div>
+                </header>
+
+                <div class="library-view-tabs" id="libraryViewTabs" role="tablist" aria-label="Vistas de biblioteca">
+                    <button class="is-active" type="button" data-library-view="home" role="tab" aria-selected="true">Inicio</button>
+                    <button type="button" data-library-view="artists" role="tab">Artistas</button>
+                    <button type="button" data-library-view="albums" role="tab">Álbumes</button>
+                    <button type="button" data-library-view="playlists" role="tab">Playlists</button>
+                    <button type="button" data-library-view="tracks" role="tab">Canciones</button>
+                    <button type="button" data-library-view="videos" role="tab">Videos</button>
+                </div>
+
+                <div class="library-status" id="libraryCount" role="status">Preparando biblioteca…</div>
+                <main class="library-surface" id="librarySurface" aria-live="polite"></main>
+            </div>
+        </section>
     </div>
 
-    <section class="mini-player" id="miniPlayer" hidden aria-label="Minirreproductor">
-        <div class="mini-player-copy">
-            <span class="mini-player-kicker">Reproduciendo desde tu biblioteca</span>
-            <div class="mini-player-title" id="miniPlayerTitle">Sin seleccion</div>
-            <div class="mini-player-subtitle" id="miniPlayerSubtitle"></div>
-        </div>
-        <div class="mini-player-media">
-            <audio id="miniPlayerAudio" controls preload="metadata"></audio>
-            <video id="miniPlayerVideo" controls preload="metadata" hidden></video>
-        </div>
-        <div class="mini-player-actions">
-            <button class="mini-player-button" id="libraryToggle" type="button">Biblioteca</button>
-            <button class="mini-player-button" id="miniPlayerClose" type="button">Cerrar</button>
-        </div>
-    </section>
-    <button class="library-launcher" id="libraryToggleLauncher" type="button">♪ Biblioteca</button>
-
-    <aside class="library-drawer" id="libraryDrawer" hidden aria-label="Biblioteca local">
-        <div class="library-drawer-head">
-            <div>
-                <h2>Biblioteca local</h2>
-                <small id="libraryCount">Actualizando...</small>
+    <section class="mini-player" id="miniPlayer" hidden aria-label="Reproductor">
+        <div class="mini-player-now">
+            <div class="player-cover-wrap">
+                <img class="player-cover" id="miniPlayerCover" alt="" hidden>
+                <span class="player-cover-placeholder" id="miniPlayerCoverPlaceholder">♪</span>
             </div>
-            <button class="mini-player-button" id="libraryClose" type="button" style="color:#7c2d12;background:#fff4ec;">Cerrar</button>
+            <div class="mini-player-copy">
+                <span class="mini-player-kicker" id="miniPlayerState">Reproduciendo desde tu biblioteca</span>
+                <div class="mini-player-title" id="miniPlayerTitle">Sin selección</div>
+                <div class="mini-player-subtitle" id="miniPlayerSubtitle"></div>
+            </div>
         </div>
-        <div class="library-drawer-tools">
-            <input class="library-search" id="librarySearch" type="search" placeholder="Buscar titulo, artista o album...">
-            <button class="mini-player-button" id="libraryRefresh" type="button" style="color:#7c2d12;background:#fff4ec;">Actualizar</button>
+        <div class="player-center">
+            <div class="player-transport">
+                <button class="player-icon-button" id="playerShuffle" type="button" aria-label="Activar reproducción aleatoria" title="Aleatorio">↝</button>
+                <button class="player-icon-button" id="playerPrevious" type="button" aria-label="Canción anterior" title="Anterior">▮◀</button>
+                <button class="player-play-button" id="playerPlayPause" type="button" aria-label="Reproducir">▶</button>
+                <button class="player-icon-button" id="playerNext" type="button" aria-label="Canción siguiente" title="Siguiente">▶▮</button>
+                <button class="player-icon-button" id="playerRepeat" type="button" aria-label="Cambiar repetición" title="Repetir">↻</button>
+            </div>
+            <div class="player-progress-row">
+                <span id="playerElapsed">0:00</span>
+                <input id="playerSeek" type="range" min="0" max="100" value="0" step="0.1" aria-label="Posición de reproducción">
+                <span id="playerDuration">0:00</span>
+            </div>
         </div>
-        <div class="library-list" id="libraryList"></div>
+        <div class="player-tools">
+            <button class="player-icon-button" id="playerLyrics" type="button" aria-label="Ver letras" title="Letras" disabled>Letra</button>
+            <button class="player-icon-button" id="playerQueue" type="button" aria-label="Ver cola" title="Cola">Cola</button>
+            <button class="player-icon-button" id="playerMute" type="button" aria-label="Silenciar" title="Volumen">🔊</button>
+            <input id="playerVolume" type="range" min="0" max="1" value="0.8" step="0.01" aria-label="Volumen">
+            <button class="player-icon-button" id="libraryToggle" type="button" aria-label="Abrir biblioteca" title="Biblioteca">Biblioteca</button>
+            <button class="player-icon-button" id="miniPlayerClose" type="button" aria-label="Cerrar reproductor" title="Cerrar">×</button>
+        </div>
+        <audio id="miniPlayerAudio" preload="metadata"></audio>
+    </section>
+
+    <aside class="player-side-panel" id="playerQueuePanel" hidden aria-label="Cola de reproducción">
+        <div class="player-panel-head">
+            <div><span class="ymd-brand-kicker">A continuación</span><h2>Cola</h2></div>
+            <button class="player-icon-button" type="button" data-close-player-panel>×</button>
+        </div>
+        <div class="player-panel-list" id="playerQueueList"></div>
     </aside>
+
+    <aside class="player-side-panel lyrics-panel" id="playerLyricsPanel" hidden aria-label="Letras">
+        <div class="player-panel-head">
+            <div><span class="ymd-brand-kicker">Ahora suena</span><h2 id="lyricsTitle">Letra</h2></div>
+            <button class="player-icon-button" type="button" data-close-player-panel>×</button>
+        </div>
+        <pre id="lyricsContent">Selecciona una canción con letras.</pre>
+    </aside>
+
+    <section class="video-stage" id="videoStage" hidden aria-label="Reproductor de video">
+        <button class="player-icon-button video-stage-close" id="videoStageClose" type="button" aria-label="Cerrar video">×</button>
+        <video id="miniPlayerVideo" controls preload="metadata"></video>
+    </section>
+
+    <div class="library-toast" id="libraryToast" role="status" hidden></div>
 
     <script>
         let currentQueueId = null;
@@ -1392,6 +1440,7 @@
         let queueUiSeq = 0;
         let activeQueueUiId = null;
         let remoteQueueItems = [];
+        let remoteBatchItems = [];
         let historyItems = [];
         let lastMonitoredStatus = '';
         const retryInFlight = new Set();
@@ -1401,10 +1450,11 @@
             audio_quality: '320',
             video_format: 'mp4',
             video_quality: '1080',
-            folder_structure: '{artist}/{year} - {album}',
-            playlist_folder_mode: 'inherit',
+            folder_structure: '{album_artist}/{year} - {album}',
+            playlist_folder_mode: 'smart',
             playlist_folder_template: '',
-            filename_format: '{track:02d} - {title}',
+            filename_format: '{track:02d} {title}',
+            playlist_filename_format: '{playlist_track:02d} - {title}',
             duplicate_mode: 'skip',
             smart_organize: true,
             embed_lyrics: true,
@@ -1448,6 +1498,10 @@
                 iniciando: 'iniciando',
                 analizando: 'analizando',
                 descargando: 'descargando'
+                ,starting: 'iniciando'
+                ,running: 'descargando'
+                ,completed: 'completado'
+                ,cancelled: 'cancelado'
             };
             return map[status] || status || 'pendiente';
         }
@@ -2011,6 +2065,7 @@
                 artist: document.getElementById('artistInput').value || 'Unknown',
                 title: (currentDetected && currentDetected.title) ? currentDetected.title : 'Unknown',
                 album: document.getElementById('albumInput').value || 'Unknown',
+                collection_kind: currentDetected?.collection_kind || 'playlist',
                 genre: document.getElementById('genreInput')?.value || '',
                 composer: document.getElementById('composerInput')?.value || '',
                 year: Number(document.getElementById('yearInput')?.value || new Date().getFullYear()),
@@ -2038,6 +2093,7 @@
                 playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
                 playlist_folder_template: runtimeConfig.playlist_folder_template || '',
                 filename_format: runtimeConfig.filename_format,
+                playlist_filename_format: runtimeConfig.playlist_filename_format || '{playlist_track:02d} - {title}',
                 duplicate_mode: runtimeConfig.duplicate_mode,
                 force_redownload: document.getElementById('forceRedownload').checked,
                 smart_organize: runtimeConfig.smart_organize !== false,
@@ -2094,6 +2150,29 @@
             return `${(type || 'single').toLowerCase()}|${canonicalQueueUrl(payload?.url || '')}`;
         }
 
+        function restorePendingQueue() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('ymd.pendingQueue') || '[]');
+                if (!Array.isArray(saved)) return;
+                pendingDownloadQueue = saved.slice(0, 20).map((job) => ({
+                    ...job,
+                    localStatus: job.localStatus === 'processing' ? 'pending' : (job.localStatus || 'pending'),
+                    progress: job.localStatus === 'processing' ? 0 : (job.progress || 0)
+                }));
+                queueUiSeq = pendingDownloadQueue.length;
+            } catch (error) {
+                console.warn('No se pudo restaurar la cola local:', error);
+            }
+        }
+
+        function persistPendingQueue() {
+            try {
+                localStorage.setItem('ymd.pendingQueue', JSON.stringify(pendingDownloadQueue.slice(0, 20)));
+            } catch (error) {
+                console.warn('No se pudo persistir la cola local:', error);
+            }
+        }
+
         function isQueueActiveStatus(status) {
             return ['pending', 'processing', 'paused', 'iniciando', 'analizando', 'descargando', 'pausado'].includes((status || '').toLowerCase());
         }
@@ -2103,7 +2182,7 @@
         }
 
         function findRemoteDuplicateJob(signature) {
-            return (remoteQueueItems || []).find((item) => {
+            return [...(remoteQueueItems || []), ...(remoteBatchItems || [])].find((item) => {
                 if (!isQueueActiveStatus(item.status)) return false;
                 const remoteSignature = `${(item.type || 'single').toLowerCase()}|${canonicalQueueUrl(item.source_url || '')}`;
                 return remoteSignature === signature;
@@ -2145,6 +2224,7 @@
                 artist: detected.uploader || detected.artist || 'Unknown',
                 title: detected.title || 'Unknown',
                 album: detected.album || detected.title || 'Unknown',
+                collection_kind: detected.collection_kind || (isSingle ? '' : 'playlist'),
                 thumbnail: detected.thumbnail || '',
                 download_mode: runtimeConfig.download_mode,
                 audio_format: runtimeConfig.audio_format,
@@ -2155,6 +2235,7 @@
                 playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
                 playlist_folder_template: runtimeConfig.playlist_folder_template || '',
                 filename_format: runtimeConfig.filename_format,
+                playlist_filename_format: runtimeConfig.playlist_filename_format || '{playlist_track:02d} - {title}',
                 duplicate_mode: runtimeConfig.duplicate_mode,
                 force_redownload: document.getElementById('forceRedownload').checked,
                 smart_organize: runtimeConfig.smart_organize !== false,
@@ -2273,10 +2354,12 @@
 
             const pendingCount = pendingDownloadQueue.filter((item) => ['pending', 'paused'].includes(item.localStatus)).length;
             const failedCount = pendingDownloadQueue.filter((item) => ['error', 'cancelado'].includes(item.localStatus)).length;
-            const remoteActive = (remoteQueueItems || []).filter((item) => !['completado', 'error'].includes(item.status)).length;
+            persistPendingQueue();
+            const remoteActive = (remoteQueueItems || []).filter((item) => !['completado', 'error', 'cancelado'].includes(item.status)).length
+                + (remoteBatchItems || []).filter((item) => ['pending', 'starting', 'running'].includes(item.status)).length;
             meta.textContent = `${pendingCount} pendientes | ${failedCount} fallidas | ${remoteActive} activas en backend`;
 
-            if (!pendingDownloadQueue.length && !(remoteQueueItems || []).length) {
+            if (!pendingDownloadQueue.length && !(remoteQueueItems || []).length && !(remoteBatchItems || []).length) {
                 box.innerHTML = `<div class="queue-empty">Agrega tareas desde la deteccion actual. La cola se ejecuta en secuencia para que la app se comporte como un gestor de descargas.</div>`;
                 return;
             }
@@ -2329,6 +2412,35 @@
                 .filter((item) => !localQueueIds.has(Number(item.queue_id || 0)))
                 .slice(0, 8);
 
+            const batchHtml = (remoteBatchItems || []).slice().reverse().slice(0, 12).map((item) => {
+                const statusClass = formatStatusLabel(item.status);
+                const controls = ['error', 'cancelled'].includes(item.status)
+                    ? `<button class="btn btn-secondary" type="button" onclick="controlBatchJob('${item.job_id}', 'retry')">Reintentar</button>
+                       <button class="btn btn-secondary" type="button" onclick="controlBatchJob('${item.job_id}', 'remove')">Quitar</button>`
+                    : (['pending', 'starting', 'running'].includes(item.status)
+                        ? `<button class="btn btn-secondary" type="button" onclick="controlBatchJob('${item.job_id}', 'cancel')">Cancelar</button>`
+                        : `<button class="btn btn-secondary" type="button" onclick="controlBatchJob('${item.job_id}', 'remove')">Quitar</button>`);
+                return `
+                    <div class="queue-item-card ${['starting', 'running'].includes(item.status) ? 'active' : ''}">
+                        <div class="queue-item-body">
+                            ${renderMiniThumb('', item.label || 'LOTE', 'queue')}
+                            <div>
+                                <div class="queue-item-top">
+                                    <div>
+                                        <div class="queue-item-title">${escapeHtml(item.label || 'Descarga persistente')}</div>
+                                        <div class="queue-item-sub">${escapeHtml((item.type || 'download') + ' | cola persistente')}</div>
+                                    </div>
+                                    <span class="status-chip ${escapeHtml(statusClass)}">${escapeHtml(statusClass)}</span>
+                                </div>
+                                <div class="meta-line">${escapeHtml(item.message || '')}</div>
+                                <div class="meta-line">Origen: ${escapeHtml(item.source_url || '')}</div>
+                                <div class="mini-progress"><span style="width:${Number(item.progress || 0)}%"></span></div>
+                                <div class="queue-actions">${controls}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+
             const remoteHtml = visibleRemoteItems.map((item) => {
                 const statusClass = formatStatusLabel(item.status);
                 const remoteDestEncoded = encodeURIComponent(item.destination || '');
@@ -2363,7 +2475,7 @@
                 `;
             }).join('');
 
-            box.innerHTML = [localHtml, remoteHtml].filter(Boolean).join('');
+            box.innerHTML = [localHtml, batchHtml, remoteHtml].filter(Boolean).join('');
         }
 
         function renderHistoryList() {
@@ -2410,17 +2522,35 @@
 
         async function refreshQueuePanels() {
             try {
-                const [queueRes, historyRes] = await Promise.all([
+                const [queueRes, batchRes, historyRes] = await Promise.all([
                     fetch('/api/queue'),
+                    fetch('/api/batch-queue'),
                     fetch('/api/history')
                 ]);
                 remoteQueueItems = queueRes.ok ? await queueRes.json() : [];
+                remoteBatchItems = batchRes.ok ? await batchRes.json() : [];
                 historyItems = historyRes.ok ? await historyRes.json() : [];
             } catch (e) {
                 console.error('Error refrescando paneles:', e);
             }
             renderQueueList();
             renderHistoryList();
+        }
+
+        async function controlBatchJob(jobId, action) {
+            try {
+                const res = await fetch(`/api/batch-queue/${jobId}/control`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                addLog(`[OK] Cola persistente: ${action}`);
+                await refreshQueuePanels();
+            } catch (error) {
+                addLog(`[ERROR] No se pudo modificar la cola persistente: ${error.message}`);
+            }
         }
 
         async function controlRemoteQueue(queueId, action) {
@@ -2590,16 +2720,33 @@
         }
 
         async function startQueuedDownloads() {
-            if (activeQueueUiId || statusCheckInterval) {
-                addLog('[INFO] Ya hay una tarea en ejecucion');
-                return;
-            }
-            const nextJob = pendingDownloadQueue.find((item) => item.localStatus === 'pending');
-            if (!nextJob) {
+            const pendingJobs = pendingDownloadQueue.filter((item) => item.localStatus === 'pending');
+            if (!pendingJobs.length) {
                 addLog('[INFO] No hay tareas pendientes en la cola');
                 return;
             }
-            await processQueuedJob(nextJob);
+            try {
+                const res = await fetch('/api/batch-queue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jobs: pendingJobs.map((job) => ({
+                            kind: job.type,
+                            label: job.label,
+                            payload: job.payload
+                        }))
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const submittedIds = new Set(pendingJobs.map((job) => job.uiId));
+                pendingDownloadQueue = pendingDownloadQueue.filter((job) => !submittedIds.has(job.uiId));
+                persistPendingQueue();
+                addLog(`[OK] Cola entregada al backend: ${data.created} nuevas, ${data.duplicates} duplicadas`);
+                await refreshQueuePanels();
+            } catch (error) {
+                addLog(`[ERROR] No se pudo entregar la cola persistente: ${error.message}`);
+            }
         }
 
         function updateSelectionCount() {
@@ -2772,6 +2919,7 @@
                 currentUrlType = data.type;
                 currentVideos = data.videos || [];
                 currentDetected = data;
+                window.YMDApp?.notifyLinkDetected(data.title || data.type);
 
                 const urlInfo = document.getElementById('urlInfo');
                 const badge = document.getElementById('urlBadge');
@@ -2796,6 +2944,7 @@
 
                     document.getElementById('artistInput').value = data.uploader || data.title || '';
                     document.getElementById('albumInput').value = data.title || '';
+                    if (data.year) document.getElementById('yearInput').value = data.year;
 
                     addLog(`[OK] Detectado ${data.type}: ${currentVideos.length} items listos`);
                 } else {
@@ -2959,6 +3108,7 @@
         }
 
         window.addEventListener('load', async () => {
+            restorePendingQueue();
             const urlInput = document.getElementById('urlInput');
             const searchInput = document.getElementById('itemSearch');
             const listHeightRange = document.getElementById('listHeightRange');
@@ -3068,5 +3218,6 @@
         });
     </script>
     <script src="{{ url_for('static', filename='js/mini-player.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>
 </body>
 </html>

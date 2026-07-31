@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ymd.metadata import (
     apply_metadata_defaults,
+    apply_official_album_context,
     merge_ytdlp_metadata,
     normalize_metadata,
     write_lyrics,
@@ -57,6 +58,63 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(result["artist"], "Detected Artist")
         self.assertEqual(result["format_id"], "251")
         self.assertNotIn("private-token", json.dumps(result))
+
+    def test_applies_one_official_album_context_to_flat_playlist(self):
+        items = [
+            {
+                "title": "Rompiendo Los Limites (Intro)",
+                "artist": "Triple Seven Oficial ",
+                "album": "",
+                "album_artist": "",
+                "year": "",
+                "position": 1,
+            },
+            {"title": "Victorioso", "artist": "Triple Seven Oficial ", "position": 2},
+        ]
+        result = apply_official_album_context(
+            items,
+            "Album - Rompiendo Los Limites",
+            {
+                "artist": "Triple Seven",
+                "artists": ["Triple Seven"],
+                "album": "Rompiendo Los Limites",
+                "release_year": 2005,
+            },
+        )
+        self.assertEqual(result[0]["album_artist"], "Triple Seven")
+        self.assertEqual(result[0]["year"], 2005)
+        self.assertEqual(result[0]["track_total"], 2)
+        self.assertEqual(result[1]["artist"], "Triple Seven")
+        self.assertEqual(result[1]["track"], 2)
+
+    def test_playlist_order_is_preserved_while_real_music_fields_are_used(self):
+        result = merge_ytdlp_metadata(
+            {
+                "title": "Flat title",
+                "artist": "Playlist channel",
+                "album": "",
+                "album_artist": "Various Artists",
+                "collection_kind": "playlist",
+                "playlist_title": "Road Trip",
+                "playlist_position": 7,
+                "playlist_total": 20,
+                "compilation": True,
+            },
+            {
+                "track": "Real title",
+                "artist": "Real Artist",
+                "album": "Real Album",
+                "album_artist": "Real Artist",
+                "track_number": 3,
+                "track_count": 12,
+                "release_year": 2019,
+            },
+        )
+        self.assertEqual(result["artist"], "Real Artist")
+        self.assertEqual(result["album"], "Real Album")
+        self.assertEqual(result["album_artist"], "Real Artist")
+        self.assertEqual(result["track"], 7)
+        self.assertEqual(result["track_total"], 20)
 
     def test_embeds_lyrics_in_mp3(self):
         with tempfile.TemporaryDirectory() as folder:

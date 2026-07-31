@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -22,18 +23,28 @@ from mutagen.id3 import (
     TBPM,
     TCOM,
     TCOP,
+    TDOR,
     TDRC,
     TENC,
+    TEXT,
     TIT1,
     TIT2,
+    TKEY,
     TLAN,
     TPE1,
     TPE2,
+    TPE3,
+    TPE4,
     TPOS,
     TPUB,
     TRCK,
+    TSOA,
+    TSOC,
+    TSOP,
+    TSOT,
     TSRC,
     TXXX,
+    UFID,
     USLT,
     ID3NoHeaderError,
 )
@@ -64,6 +75,23 @@ ADVANCED_FIELDS = (
     "catalog_number",
     "barcode",
     "mood",
+    "release_date",
+    "original_release_date",
+    "lyricist",
+    "producer",
+    "conductor",
+    "remixer",
+    "performers",
+    "key",
+    "title_sort",
+    "artist_sort",
+    "album_sort",
+    "album_artist_sort",
+    "composer_sort",
+    "replaygain_track_gain",
+    "replaygain_track_peak",
+    "loudness_integrated",
+    "true_peak",
 )
 
 PROVENANCE_FIELDS = (
@@ -93,6 +121,41 @@ PROVENANCE_FIELDS = (
     "musicbrainz_releasegroupid",
     "musicbrainz_artistids",
     "musicbrainz_score",
+    "acoustid_id",
+    "acoustid_fingerprint",
+    "metadata_sources_used",
+    "metadata_confidence",
+    "metadata_missing",
+    "enrichment_status",
+    "enrichment_providers_json",
+    "credits_source",
+    "credits_json",
+    "written_by",
+    "metadata_provider",
+    "explicit_known",
+    "audio_analysis_source",
+    "audio_analysis_status",
+    "audio_analysis_error",
+    "collection_kind",
+    "playlist_title",
+    "playlist_owner",
+    "playlist_url",
+    "playlist_position",
+    "playlist_total",
+    "playlist_cover_url",
+    "cover_source",
+    "cover_source_url",
+    "cover_width",
+    "cover_height",
+)
+
+HIGH_VALUE_OPTIONAL_FIELDS = (
+    "genre",
+    "composer",
+    "producer",
+    "publisher",
+    "isrc",
+    "language",
 )
 
 
@@ -114,6 +177,10 @@ def normalize_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     result.setdefault("year", "")
     result.setdefault("track", 1)
     result.setdefault("genre", "")
+
+    for key in ("release_date", "original_release_date"):
+        if result.get(key):
+            result[key] = _normalized_date(result[key])
 
     for key in ("track", "track_total", "disc", "disc_total", "bpm"):
         value = result.get(key)
@@ -159,6 +226,50 @@ def _joined(value: Any, *, limit: int = 1000) -> str:
     return text[:limit]
 
 
+def _normalized_date(value: Any) -> str:
+    text = str(value or "").strip()
+    if re.fullmatch(r"\d{8}", text):
+        return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+    if re.fullmatch(r"\d{6}", text):
+        return f"{text[:4]}-{text[4:6]}"
+    return text
+
+
+def annotate_metadata_availability(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Record enrichment completeness without fabricating unavailable values."""
+
+    result = dict(metadata)
+    if result.get("credits") and not result.get("credits_json"):
+        result["credits_json"] = json.dumps(
+            result["credits"], ensure_ascii=False, separators=(",", ":")
+        )[:8000]
+    missing = [
+        field
+        for field in HIGH_VALUE_OPTIONAL_FIELDS
+        if result.get(field) in ("", None, [], {})
+    ]
+    existing = result.get("metadata_missing")
+    if isinstance(existing, str):
+        missing.extend(part.strip() for part in existing.split(";") if part.strip())
+    elif isinstance(existing, (list, tuple, set)):
+        missing.extend(str(part).strip() for part in existing if str(part).strip())
+    result["metadata_missing"] = "; ".join(dict.fromkeys(missing))
+
+    sources = result.get("metadata_sources_used")
+    if not sources:
+        detected_sources = ["yt-dlp"] if result.get("youtube_id") else []
+        if result.get("musicbrainz_recordingid") or result.get("musicbrainz_releaseid"):
+            detected_sources.append("musicbrainz")
+        if result.get("acoustid_id"):
+            detected_sources.append("acoustid")
+        result["metadata_sources_used"] = "; ".join(detected_sources)
+    result.setdefault(
+        "enrichment_status",
+        "partial" if missing else "complete",
+    )
+    return result
+
+
 def merge_ytdlp_metadata(
     metadata: Mapping[str, Any],
     info: Mapping[str, Any] | None,
@@ -173,6 +284,13 @@ def merge_ytdlp_metadata(
     composers = source.get("composers") or []
     chapters = source.get("chapters") or []
     upload_date = str(source.get("upload_date") or "")
+    release_date = str(source.get("release_date") or "")
+    release_year = source.get("release_year") or (release_date[:4] if release_date else "")
+    collection_kind = str(merged.get("collection_kind") or "")
+    if not release_year and collection_kind not in {"official_album"}:
+        # For ordinary uploads the upload year is still useful, but it must
+        # remain distinguishable from RELEASE_DATE in provenance.
+        release_year = upload_date[:4] if upload_date else ""
 
     detected = {
         "title": source.get("track") or source.get("title"),
@@ -184,12 +302,13 @@ def merge_ytdlp_metadata(
         "album_artist": source.get("album_artist"),
         "composer": _joined(composers) or source.get("composer"),
         "genre": _joined(source.get("genres") or source.get("genre")),
-        "year": source.get("release_year") or (upload_date[:4] if upload_date else ""),
+        "year": release_year,
         "track": source.get("track_number"),
         "track_total": source.get("track_count"),
         "disc": source.get("disc_number"),
         "disc_total": source.get("disc_count"),
-        "release_date": source.get("release_date"),
+        "release_date": release_date,
+        "explicit": source.get("age_limit") not in (None, 0, "0") if source.get("age_limit") is not None else None,
         "youtube_id": source.get("id"),
         "channel": source.get("channel"),
         "channel_id": source.get("channel_id"),
@@ -221,13 +340,90 @@ def merge_ytdlp_metadata(
             continue
         if key in overwrite_when_authoritative or merged.get(key) in ("", None, "Unknown"):
             merged[key] = value
+
+    if collection_kind in {"playlist", "official_album"}:
+        # Flat playlist extraction often exposes only the uploader. The full
+        # per-track lookup has the authoritative music fields, so prefer those
+        # without treating the playlist owner as the recording artist.
+        music_artist = _joined(source.get("artists") or source.get("creators") or [])
+        music_artist = music_artist or source.get("artist") or source.get("creator")
+        if music_artist:
+            merged["artist"] = music_artist
+        for field, source_field in (
+            ("album", "album"),
+            ("album_artist", "album_artist"),
+            ("composer", "composer"),
+        ):
+            if source.get(source_field):
+                merged[field] = source[source_field]
+
+        if collection_kind == "playlist":
+            # Folder/file order and player order must match the playlist even
+            # when the original album has a different track number.
+            merged["track"] = merged.get("playlist_position") or merged.get("playlist_track") or 1
+            merged["track_total"] = merged.get("playlist_total") or merged.get("track_total")
+            if merged.get("album") in ("", None, "Unknown"):
+                merged["album"] = merged.get("playlist_title") or "Playlist"
+            if merged.get("album_artist") in ("", None, "Unknown"):
+                merged["album_artist"] = (
+                    "Various Artists" if merged.get("compilation") else merged.get("artist")
+                )
     if detected.get("webpage_url"):
         merged["source_url"] = detected["webpage_url"]
-    return normalize_metadata(merged)
+    return normalize_metadata(annotate_metadata_availability(merged))
+
+
+def apply_official_album_context(
+    items: list[Mapping[str, Any]],
+    playlist_title: str,
+    track_info: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Fill flat YouTube Music album entries from one full track lookup."""
+
+    clean_title = re.sub(
+        r"^\s*album\s*[-:|]\s*",
+        "",
+        str(playlist_title or ""),
+        flags=re.I,
+    ).strip()
+    artists = track_info.get("artists") or track_info.get("creators") or []
+    artist = (
+        _joined(artists)
+        or _clean(track_info.get("artist"))
+        or _clean(track_info.get("album_artist"))
+    )
+    album = _clean(track_info.get("album")) or clean_title
+    album_artist = _clean(track_info.get("album_artist")) or artist
+    release_date = str(track_info.get("release_date") or "")
+    year = _clean(track_info.get("release_year")) or (release_date[:4] if release_date else "")
+
+    enriched: list[dict[str, Any]] = []
+    for index, source in enumerate(items, 1):
+        item = dict(source)
+        if album:
+            item["album"] = item.get("album") or album
+        if album_artist:
+            item["album_artist"] = item.get("album_artist") or album_artist
+        if year:
+            item["year"] = item.get("year") or year
+        if artist:
+            current_artist = str(item.get("artist") or "").strip()
+            if not current_artist or re.search(
+                r"\s+(oficial|official)\s*$",
+                current_artist,
+                flags=re.I,
+            ):
+                item["artist"] = artist
+        item["track"] = item.get("track") or item.get("position") or index
+        item["track_total"] = item.get("track_total") or len(items)
+        enriched.append(item)
+    return enriched
 
 
 def _fraction(current: Any, total: Any) -> str:
-    current_value = str(current or 0)
+    if current in ("", None, 0, "0"):
+        return ""
+    current_value = str(current)
     return f"{current_value}/{total}" if total not in ("", None, 0, "0") else current_value
 
 
@@ -255,6 +451,7 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
         "TPE1",
         "TPE2",
         "TDRC",
+        "TDOR",
         "TRCK",
         "TPOS",
         "TCON",
@@ -265,6 +462,14 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
         "TBPM",
         "TSRC",
         "TENC",
+        "TEXT",
+        "TPE3",
+        "TPE4",
+        "TSOA",
+        "TSOC",
+        "TSOP",
+        "TSOT",
+        "TKEY",
         "COMM",
     ):
         tags.delall(frame_id)
@@ -273,7 +478,8 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
     _set_text(tags, TPE1, data.get("artist"))
     _set_text(tags, TALB, data.get("album"))
     _set_text(tags, TPE2, data.get("album_artist"))
-    _set_text(tags, TDRC, data.get("year"))
+    _set_text(tags, TDRC, _normalized_date(data.get("release_date") or data.get("year")))
+    _set_text(tags, TDOR, _normalized_date(data.get("original_release_date")))
     _set_text(tags, TRCK, _fraction(data.get("track"), data.get("track_total")))
     _set_text(tags, TPOS, _fraction(data.get("disc"), data.get("disc_total")))
     _set_text(tags, TCOM, data.get("composer"))
@@ -284,6 +490,14 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
     _set_text(tags, TSRC, data.get("isrc"))
     _set_text(tags, TIT1, data.get("grouping"))
     _set_text(tags, TENC, data.get("encoded_by"))
+    _set_text(tags, TEXT, data.get("lyricist"))
+    _set_text(tags, TPE3, data.get("conductor"))
+    _set_text(tags, TPE4, data.get("remixer"))
+    _set_text(tags, TSOA, data.get("album_sort"))
+    _set_text(tags, TSOC, data.get("composer_sort"))
+    _set_text(tags, TSOP, data.get("artist_sort") or data.get("album_artist_sort"))
+    _set_text(tags, TSOT, data.get("title_sort"))
+    _set_text(tags, TKEY, data.get("key"))
 
     genre = data.get("genre")
     if genre not in ("", None):
@@ -296,7 +510,9 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
     custom_fields = {
         "SOURCE_URL": data.get("source_url"),
         "COMPILATION": "1" if data.get("compilation") else "",
-        "ITUNESADVISORY": "1" if data.get("explicit") else "",
+        "ITUNESADVISORY": (
+            "1" if data.get("explicit") else ("0" if data.get("explicit_known") else "")
+        ),
         **{field.upper(): _joined(data.get(field), limit=8000) for field in PROVENANCE_FIELDS},
         "RELEASE_TYPE": data.get("release_type"),
         "RELEASE_COUNTRY": data.get("release_country"),
@@ -304,11 +520,30 @@ def _write_id3(file_path: str | Path, data: Mapping[str, Any], *, wave: bool = F
         "CATALOGNUMBER": data.get("catalog_number"),
         "BARCODE": data.get("barcode"),
         "MOOD": data.get("mood"),
+        "PRODUCER": data.get("producer"),
+        "PERFORMERS": _joined(data.get("performers"), limit=4000),
+        "MusicBrainz Album Id": data.get("musicbrainz_releaseid"),
+        "MusicBrainz Release Group Id": data.get("musicbrainz_releasegroupid"),
+        "MusicBrainz Artist Id": data.get("musicbrainz_artistids"),
+        "Acoustid Id": data.get("acoustid_id"),
+        "Acoustid Fingerprint": data.get("acoustid_fingerprint"),
+        "REPLAYGAIN_TRACK_GAIN": data.get("replaygain_track_gain"),
+        "REPLAYGAIN_TRACK_PEAK": data.get("replaygain_track_peak"),
+        "LOUDNESS_INTEGRATED": data.get("loudness_integrated"),
+        "TRUE_PEAK": data.get("true_peak"),
     }
     for description, value in custom_fields.items():
         tags.delall("TXXX:" + description)
         if value:
             tags.add(TXXX(encoding=3, desc=description, text=[str(value)]))
+    tags.delall("UFID:http://musicbrainz.org")
+    if data.get("musicbrainz_recordingid"):
+        tags.add(
+            UFID(
+                owner="http://musicbrainz.org",
+                data=str(data["musicbrainz_recordingid"]).encode("ascii", errors="ignore"),
+            )
+        )
     if data.get("description"):
         tags.add(COMM(encoding=3, lang="eng", desc="DESCRIPTION", text=[str(data["description"])]))
 
@@ -325,13 +560,18 @@ def _write_mp4(file_path: str | Path, data: Mapping[str, Any]) -> None:
         "\xa9ART": data.get("artist"),
         "\xa9alb": data.get("album"),
         "aART": data.get("album_artist"),
-        "\xa9day": data.get("year"),
+        "\xa9day": _normalized_date(data.get("release_date") or data.get("year")),
         "\xa9gen": data.get("genre"),
         "\xa9wrt": data.get("composer"),
         "cprt": data.get("copyright"),
         "\xa9cmt": data.get("comment"),
         "\xa9grp": data.get("grouping"),
         "\xa9too": data.get("encoded_by"),
+        "sonm": data.get("title_sort"),
+        "soar": data.get("artist_sort"),
+        "soal": data.get("album_sort"),
+        "soaa": data.get("album_artist_sort"),
+        "soco": data.get("composer_sort"),
     }
     for atom, value in mapping.items():
         if value not in ("", None):
@@ -345,6 +585,8 @@ def _write_mp4(file_path: str | Path, data: Mapping[str, Any]) -> None:
         audio["cpil"] = [True]
     if data.get("explicit"):
         audio["rtng"] = [4]
+    elif data.get("explicit_known"):
+        audio["rtng"] = [2]
 
     freeform = {
         "SOURCE_URL": data.get("source_url"),
@@ -358,6 +600,23 @@ def _write_mp4(file_path: str | Path, data: Mapping[str, Any]) -> None:
         "CATALOGNUMBER": data.get("catalog_number"),
         "BARCODE": data.get("barcode"),
         "MOOD": data.get("mood"),
+        "ORIGINALDATE": data.get("original_release_date"),
+        "LYRICIST": data.get("lyricist"),
+        "PRODUCER": data.get("producer"),
+        "CONDUCTOR": data.get("conductor"),
+        "REMIXER": data.get("remixer"),
+        "PERFORMERS": _joined(data.get("performers"), limit=4000),
+        "INITIALKEY": data.get("key"),
+        "MusicBrainz Album Id": data.get("musicbrainz_releaseid"),
+        "MusicBrainz Release Group Id": data.get("musicbrainz_releasegroupid"),
+        "MusicBrainz Artist Id": data.get("musicbrainz_artistids"),
+        "MusicBrainz Track Id": data.get("musicbrainz_recordingid"),
+        "Acoustid Id": data.get("acoustid_id"),
+        "Acoustid Fingerprint": data.get("acoustid_fingerprint"),
+        "REPLAYGAIN_TRACK_GAIN": data.get("replaygain_track_gain"),
+        "REPLAYGAIN_TRACK_PEAK": data.get("replaygain_track_peak"),
+        "LOUDNESS_INTEGRATED": data.get("loudness_integrated"),
+        "TRUE_PEAK": data.get("true_peak"),
     }
     for key, value in freeform.items():
         if value not in ("", None):
@@ -377,7 +636,8 @@ def _write_vorbis(file_path: str | Path, data: Mapping[str, Any]) -> None:
         "artist": data.get("artist"),
         "album": data.get("album"),
         "albumartist": data.get("album_artist"),
-        "date": data.get("year"),
+        "date": _normalized_date(data.get("release_date") or data.get("year")),
+        "originaldate": _normalized_date(data.get("original_release_date")),
         "tracknumber": data.get("track"),
         "tracktotal": data.get("track_total"),
         "discnumber": data.get("disc"),
@@ -402,6 +662,27 @@ def _write_vorbis(file_path: str | Path, data: Mapping[str, Any]) -> None:
         "catalognumber": data.get("catalog_number"),
         "barcode": data.get("barcode"),
         "mood": data.get("mood"),
+        "lyricist": data.get("lyricist"),
+        "producer": data.get("producer"),
+        "conductor": data.get("conductor"),
+        "remixer": data.get("remixer"),
+        "performer": _joined(data.get("performers"), limit=4000),
+        "initialkey": data.get("key"),
+        "titlesort": data.get("title_sort"),
+        "artistsort": data.get("artist_sort"),
+        "albumsort": data.get("album_sort"),
+        "albumartistsort": data.get("album_artist_sort"),
+        "composersort": data.get("composer_sort"),
+        "musicbrainz_trackid": data.get("musicbrainz_recordingid"),
+        "musicbrainz_albumid": data.get("musicbrainz_releaseid"),
+        "musicbrainz_releasegroupid": data.get("musicbrainz_releasegroupid"),
+        "musicbrainz_artistid": data.get("musicbrainz_artistids"),
+        "acoustid_id": data.get("acoustid_id"),
+        "acoustid_fingerprint": data.get("acoustid_fingerprint"),
+        "replaygain_track_gain": data.get("replaygain_track_gain"),
+        "replaygain_track_peak": data.get("replaygain_track_peak"),
+        "loudness_integrated": data.get("loudness_integrated"),
+        "true_peak": data.get("true_peak"),
     }
     for key, value in mapping.items():
         if value not in ("", None):
@@ -423,7 +704,7 @@ def write_metadata(file_path: str | Path, metadata: Mapping[str, Any]) -> None:
     """
 
     path = Path(file_path)
-    data = normalize_metadata(metadata)
+    data = normalize_metadata(annotate_metadata_availability(metadata))
     suffix = path.suffix.lower()
     if suffix == ".mp3":
         _write_id3(path, data)
