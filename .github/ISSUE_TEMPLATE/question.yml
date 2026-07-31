@@ -1,0 +1,28 @@
+name: Pregunta de uso
+description: Solicita ayuda para instalar, configurar o utilizar el proyecto
+title: "[Pregunta]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Para ideas abiertas y conversación usa Discussions. Para un fallo reproducible usa el reporte de error.
+  - type: textarea
+    id: question
+    attributes:
+      label: ¿Qué necesitas resolver?
+      description: Incluye el objetivo, lo que ya intentaste y el resultado, sin secretos ni rutas personales.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      placeholder: "0.012"
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema operativo
+      options: [Windows, Linux, macOS, Otro]
+    validations:
+      required: true

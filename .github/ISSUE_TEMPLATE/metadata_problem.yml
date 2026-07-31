@@ -1,0 +1,57 @@
+name: Problema de metadatos o cover
+description: Reporta tags, carpetas, numeración, letras o portadas incorrectas
+title: "[Metadatos]: "
+labels: ["metadata", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Comparte sólo información pública y un ejemplo mínimo. No adjuntes cookies, tokens, audio protegido, rutas personales ni URLs firmadas.
+  - type: input
+    id: version
+    attributes:
+      label: Versión de YT-Descargar
+      placeholder: "0.012"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Tipo de problema
+      options:
+        - Artista o artista del álbum
+        - Álbum, año o género
+        - Número de pista o carpeta
+        - Cover
+        - Letras
+        - Otro tag
+    validations:
+      required: true
+  - type: input
+    id: public_url
+    attributes:
+      label: URL pública de ejemplo
+      description: YouTube o YouTube Music; omite enlaces privados o firmados.
+  - type: textarea
+    id: observed
+    attributes:
+      label: Resultado actual
+      description: Nombre de carpeta/archivo y tags observados, sin datos personales.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado y fuente
+      description: Explica el valor correcto y dónde puede verificarse.
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: Eliminé secretos, cookies, rutas personales y contenido privado.
+          required: true
+        - label: El ejemplo usa contenido propio, público o autorizado.
+          required: true

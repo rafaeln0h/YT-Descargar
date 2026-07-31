@@ -1,0 +1,56 @@
+================================================================================
+  YT-DESCARGAR 0.012
+================================================================================
+
+INICIO RAPIDO:
+
+  1. Haz doble clic en: start.bat
+
+  2. Se abrira automaticamente en: http://127.0.0.1:5000
+
+  3. Pega URL de YouTube o YouTube Music
+
+  4. Haz clic en "Detectar"
+
+  5. Haz clic en "Descargar"
+
+ESO ES TODO!
+
+OPCIONES DE INICIO:
+  - start.bat               -> inicia en puerto 5000 (o siguiente libre)
+  - start.bat 5001          -> intenta iniciar en 5001 (o siguiente libre)
+  - start.bat 5000 debug    -> inicia con debug de Flask
+
+================================================================================
+
+REQUISITOS:
+  - Python 3.10+ (https://www.python.org/downloads/)
+  - FFmpeg/ffprobe en PATH o conexion para configurarlo en Windows
+
+FEATURES:
+  - Playlists completas
+  - Albums
+  - Videos individuales
+  - Canales completos
+  - Perfil MP3 320 kbps por defecto (limitado por la calidad de origen)
+  - Metadatos automaticos, tecnicos y de procedencia
+  - Metadatos y letras incrustados sin archivos .info.json adicionales
+  - Album art automatico
+  - Organizacion inteligente (artista/album/ano)
+
+SI NO FUNCIONA:
+
+  Error: "ModuleNotFoundError"
+  Solucion: pip install flask flask-cors yt-dlp mutagen musicbrainzngs pillow requests
+
+  Error: "Port 5000 already in use"
+  Solucion: start.bat 5001
+
+  Error: FFmpeg no encontrado
+  Solucion: python setup_ffmpeg.py (Windows) o instala FFmpeg en PATH
+
+IMPORTANTE:
+  Descarga solo contenido propio, de dominio publico o autorizado.
+  Consulta docs\LEGAL.md.
+
+================================================================================

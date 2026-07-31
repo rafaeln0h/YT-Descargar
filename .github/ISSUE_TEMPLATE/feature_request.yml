@@ -1,0 +1,47 @@
+name: Propuesta de mejora
+description: Sugiere una función o mejora de diseño
+title: "[Mejora]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema a resolver
+      description: Describe la necesidad, no sólo una implementación.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solución propuesta
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas y referencias
+      description: Enlaces oficiales, proyectos o diseños relacionados.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Descarga
+        - Metadatos
+        - Biblioteca y reproductor
+        - Interfaz y accesibilidad
+        - Android/iOS
+        - Windows/Linux/macOS
+        - Documentación
+        - Seguridad
+        - Otra
+    validations:
+      required: true
+  - type: checkboxes
+    id: legal
+    attributes:
+      label: Uso responsable
+      options:
+        - label: La propuesta no requiere evadir DRM ni controles de acceso.
+          required: true
+
