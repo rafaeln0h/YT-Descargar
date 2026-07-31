@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuracion - YT-Descargar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-top: #fff7ed;
+            --bg-mid: #ffe4d6;
+            --bg-bottom: #ffd7b8;
+            --ink: #211818;
+            --muted-ink: #6a5650;
+            --shadow-lg: 0 18px 60px rgba(104, 49, 23, .14);
+            --shadow-md: 0 10px 30px rgba(104, 49, 23, .10);
+        }
+        body {
+            font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,.72), transparent 34%),
+                radial-gradient(circle at right 18%, rgba(217,72,95,.14), transparent 26%),
+                linear-gradient(160deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .container { max-width: 1240px; margin: 0 auto; }
+        .topbar, .card {
+            background: linear-gradient(180deg, rgba(255,255,255,.94) 0%, rgba(255,251,248,.94) 100%);
+            border: 1px solid rgba(255,255,255,.7);
+            border-radius: 24px;
+            box-shadow: var(--shadow-md);
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 22px 24px;
+            margin-bottom: 20px;
+        }
+        .topbar h1 {
+            font-size: 30px;
+            color: #2f1912;
+            margin-bottom: 8px;
+        }
+        .muted { color: var(--muted-ink); font-size: 14px; line-height: 1.6; }
+        .card { padding: 24px; margin-bottom: 20px; }
+        .card h2 {
+            font-size: 20px;
+            color: #2b1d16;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(217,72,95,.18);
+        }
+        .section-copy {
+            color: var(--muted-ink);
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+        .panel {
+            border-radius: 20px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+            padding: 18px;
+        }
+        .panel h3 {
+            font-size: 15px;
+            color: #35231b;
+            margin-bottom: 12px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #5f311f;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            border: 2px solid #ead8cf;
+            border-radius: 12px;
+            padding: 11px 13px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #fff;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #d9485f;
+            box-shadow: 0 0 0 3px rgba(217,72,95,.12);
+        }
+        .inline-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: #263056;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .hint {
+            color: var(--muted-ink);
+            font-size: 12px;
+            line-height: 1.5;
+            margin-top: 6px;
+        }
+        .quality-buttons {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .quality-btn {
+            border: 2px solid #ead8cf;
+            background: white;
+            border-radius: 12px;
+            padding: 10px;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 12px;
+            color: #5b3629;
+        }
+        .quality-btn.active {
+            border-color: #d9485f;
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: #fff;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+        }
+        .btn-secondary {
+            background: #fff4ec;
+            color: #7c2d12;
+            border: 1px solid #ffd6c4;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #226b2f;
+            min-height: 20px;
+        }
+        .tag-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .preview-box {
+            border-radius: 14px;
+            border: 1px dashed #e2b7a3;
+            background: #fff8f3;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        .preview-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #6a3725;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 6px;
+        }
+        .preview-line {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #3f2a21;
+            font-family: Consolas, "Courier New", monospace;
+            word-break: break-word;
+            margin-bottom: 6px;
+        }
+        .path-quick-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        @media (max-width: 980px) {
+            .grid-2, .grid-3, .tag-grid { grid-template-columns: 1fr; }
+            .topbar { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div>
+                <h1>Configuracion</h1>
+                <p class="muted">Ajusta el motor de descarga, el comportamiento de `yt-dlp` y el etiquetado inteligente para listas, albumes y canciones.</p>
+            </div>
+            <div class="actions" style="margin-top:0;">
+                <a href="/suite" class="btn btn-secondary">Suite</a>
+                <a href="/" class="btn btn-primary">Volver al descargador</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Audio y Organizacion</h2>
+            <p class="section-copy">Estas opciones afectan el formato principal, calidad y estructura de guardado de tus descargas.</p>
+            <div class="grid-2">
+                <div class="panel">
+                    <h3>Salida principal</h3>
+                    <div class="form-group">
+                        <label class="form-label">Formato</label>
+                        <select id="audioFormat" class="form-select">
+                            <option value="mp3">MP3 (Recomendado)</option>
+                            <option value="m4a">M4A</option>
+                            <option value="flac">FLAC</option>
+                            <option value="opus">OPUS</option>
+                            <option value="wav">WAV</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Calidad</label>
+                        <div class="quality-buttons">
+                            <button class="quality-btn" data-quality="128" onclick="setQuality('128', event)">128</button>
+                            <button class="quality-btn" data-quality="192" onclick="setQuality('192', event)">192</button>
+                            <button class="quality-btn" data-quality="256" onclick="setQuality('256', event)">256</button>
+                            <button class="quality-btn" data-quality="320" onclick="setQuality('320', event)">320</button>
+                        </div>
+                        <input type="hidden" id="audioQuality" value="320">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Duplicados</label>
+                        <select id="duplicateMode" class="form-select">
+                            <option value="skip">Omitir si existe</option>
+                            <option value="replace">Reemplazar existente</option>
+                            <option value="keep">Conservar ambos</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Metadatos y rutas</h3>
+                    <label class="inline-check">
+                        <input type="checkbox" id="smartOrganize" checked>
+                        <span>Organizacion inteligente por artista/album detectado</span>
+                    </label>
+                    <label class="inline-check">
+                        <input type="checkbox" id="embedLyrics" checked>
+                        <span>Incrustar letras cuando existan (YouTube y respaldo LRCLIB)</span>
+                    </label>
+                    <div class="hint">Si YouTube no ofrece captions, se envían artista, título, álbum y duración a la API pública de LRCLIB para buscar una coincidencia exacta.</div>
+                    <label class="inline-check">
+                        <input type="checkbox" id="embedExtendedMetadata" checked>
+                        <span>Incrustar procedencia, codec, capítulos y datos técnicos</span>
+                    </label>
+
+                    <div class="form-group">
+                        <label class="form-label">Carpeta de descarga (raiz)</label>
+                        <input type="text" id="downloadPath" class="form-input" placeholder="Ej: D:\\Musica\\YouTube">
+                        <div class="hint">Aqui cambias donde se guarda toda la musica. Puede ser otra unidad, por ejemplo <code>D:\</code> o <code>E:\</code>.</div>
+                        <div class="path-quick-actions">
+                            <button class="btn btn-secondary" type="button" onclick="openDownloadFolder()">Abrir carpeta actual</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Carpeta</label>
+                        <input type="text" id="folderStructure" class="form-input" value="{artist}/{year} - {album}">
+                        <div class="hint">Plantilla base para canciones individuales o cuando la playlist usa modo heredado.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Organizacion de playlists</label>
+                        <select id="playlistFolderMode" class="form-select">
+                            <option value="inherit">Heredar plantilla base</option>
+                            <option value="one_folder">Todo en una carpeta por playlist</option>
+                            <option value="playlist_artist_album">Playlist / artista / album</option>
+                            <option value="playlist_album">Playlist / album</option>
+                            <option value="by_artist">Biblioteca por artista</option>
+                            <option value="by_album">Biblioteca por album</option>
+                            <option value="owner_playlist_artist">Canal playlist / playlist / artista</option>
+                            <option value="custom">Personalizado (plantilla manual)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Plantilla personalizada playlist</label>
+                        <input type="text" id="playlistFolderTemplate" class="form-input" placeholder="Ej: Playlists/{playlist_title}/{artist}/{year} - {album}">
+                        <div class="hint">Variables utiles: <code>{playlist_title}</code>, <code>{playlist_owner}</code>, <code>{artist}</code>, <code>{album_artist}</code>, <code>{album}</code>, <code>{year}</code>, <code>{playlist_track}</code>.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Nombre archivo</label>
+                        <input type="text" id="filenameFormat" class="form-input" value="{track:02d} - {title}">
+                    </div>
+
+                    <div class="preview-box">
+                        <div class="preview-title">Vista previa de resultado</div>
+                        <div class="preview-line" id="singlePreview"></div>
+                        <div class="preview-line" id="playlistPreview"></div>
+                        <div class="hint">La vista previa se actualiza automaticamente mientras cambias opciones.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Etiquetado Inteligente de Playlists</h2>
+            <p class="section-copy">Define como quieres que se escriban las etiquetas de una playlist cuando el contenido mezcla canciones sueltas, albumes y artistas distintos.</p>
+            <div class="tag-grid">
+                <div class="panel">
+                    <div class="form-group">
+                        <label class="form-label">Modo de album</label>
+                        <select id="playlistTagAlbumMode" class="form-select">
+                            <option value="smart">Inteligente: album detectado o nombre de playlist</option>
+                            <option value="playlist_title">Usar siempre el nombre de la playlist</option>
+                            <option value="detected_album">Priorizar album detectado</option>
+                            <option value="artist_plus_playlist">Artista de playlist + nombre de playlist</option>
+                        </select>
+                        <div class="hint">Controla si cada pista conserva su album detectado o si toda la lista se guarda como un solo “album”.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Modo de artista</label>
+                        <select id="playlistTagArtistMode" class="form-select">
+                            <option value="detected">Usar artista detectado por pista</option>
+                            <option value="playlist_owner">Usar artista/canal de la playlist</option>
+                            <option value="various_artists">Forzar “Various Artists”</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Album artist</label>
+                        <select id="playlistTagAlbumArtistMode" class="form-select">
+                            <option value="playlist_owner">Artista/canal de la playlist</option>
+                            <option value="track_artist">Copiar el artista de la pista</option>
+                            <option value="various_artists">Various Artists</option>
+                            <option value="none">No escribir album artist</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="form-group">
+                        <label class="form-label">Numeracion de pistas</label>
+                        <select id="playlistTrackNumberMode" class="form-select">
+                            <option value="album">Reiniciar por album</option>
+                            <option value="playlist">Seguir el orden global de la playlist</option>
+                        </select>
+                        <div class="hint">Ideal si quieres que una playlist mixta conserve numeracion por album o como una lista lineal.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Genero para playlist</label>
+                        <select id="playlistTagGenreMode" class="form-select">
+                            <option value="empty">No escribir genero</option>
+                            <option value="playlist_title">Usar el nombre de la playlist</option>
+                            <option value="custom">Usar genero personalizado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Genero personalizado</label>
+                        <input type="text" id="playlistDefaultGenre" class="form-input" placeholder="Ej: Pop, Chill, Mix, Workout">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Etiquetas avanzadas por defecto</h2>
+            <p class="section-copy">Estos valores rellenan campos vacios sin reemplazar datos detectados o escritos manualmente. Se guardan en MP3, M4A/MP4, FLAC, OGG/OPUS y WAV cuando el contenedor lo permite.</p>
+            <div class="grid-3">
+                <div class="form-group">
+                    <label class="form-label">Compositor</label>
+                    <input type="text" id="metadataComposer" class="form-input" placeholder="Compositor predeterminado">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Editorial / sello</label>
+                    <input type="text" id="metadataPublisher" class="form-input" placeholder="Publisher o label">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Copyright</label>
+                    <input type="text" id="metadataCopyright" class="form-input" placeholder="© Titular, año">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Idioma</label>
+                    <input type="text" id="metadataLanguage" class="form-input" placeholder="es, en, und">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">BPM</label>
+                    <input type="number" id="metadataBpm" class="form-input" min="0" max="999" placeholder="120">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ISRC</label>
+                    <input type="text" id="metadataIsrc" class="form-input" placeholder="Codigo ISRC">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Disco / total discos</label>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <input type="number" id="metadataDisc" class="form-input" min="0" placeholder="1">
+                        <input type="number" id="metadataDiscTotal" class="form-input" min="0" placeholder="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total de pistas</label>
+                    <input type="number" id="metadataTrackTotal" class="form-input" min="0" placeholder="12">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Agrupacion / obra</label>
+                    <input type="text" id="metadataGrouping" class="form-input" placeholder="Obra, movimiento o coleccion">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de lanzamiento</label>
+                    <input type="text" id="metadataReleaseType" class="form-input" placeholder="Album, Single, EP, Broadcast">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pais de lanzamiento</label>
+                    <input type="text" id="metadataReleaseCountry" class="form-input" placeholder="MX, ES, US">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado de lanzamiento</label>
+                    <input type="text" id="metadataReleaseStatus" class="form-input" placeholder="Official, Promotion">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Numero de catalogo</label>
+                    <input type="text" id="metadataCatalogNumber" class="form-input" placeholder="CAT-001">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Codigo de barras</label>
+                    <input type="text" id="metadataBarcode" class="form-input" placeholder="UPC / EAN">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado de animo</label>
+                    <input type="text" id="metadataMood" class="form-input" placeholder="Energetic, Chill">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Comentario</label>
+                <input type="text" id="metadataComment" class="form-input" placeholder="Nota que se escribira en archivos sin comentario">
+            </div>
+            <div class="grid-2">
+                <label class="inline-check">
+                    <input type="checkbox" id="metadataCompilation">
+                    <span>Marcar como compilacion</span>
+                </label>
+                <label class="inline-check">
+                    <input type="checkbox" id="metadataExplicit">
+                    <span>Marcar contenido explicito</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Motor yt-dlp</h2>
+            <p class="section-copy">Ajustes avanzados para estabilidad, autenticacion y comportamiento del extractor de YouTube/YouTube Music.</p>
+            <div class="grid-3">
+                <div class="panel">
+                    <h3>Cookies y cliente</h3>
+                    <div class="form-group">
+                        <label class="form-label">Cookies desde navegador</label>
+                        <select id="cookiesFromBrowser" class="form-select">
+                            <option value="">No usar cookies</option>
+                            <option value="chrome">Chrome</option>
+                            <option value="edge">Edge</option>
+                            <option value="firefox">Firefox</option>
+                            <option value="brave">Brave</option>
+                            <option value="opera">Opera</option>
+                            <option value="vivaldi">Vivaldi</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Perfil del navegador</label>
+                        <input type="text" id="cookiesProfile" class="form-input" placeholder="Default, Profile 1, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Cliente de YouTube</label>
+                        <input type="text" id="youtubePlayerClient" class="form-input" value="default,web_music">
+                        <div class="hint">Ejemplo recomendado: <code>default,web_music</code></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Resiliencia</h3>
+                    <div class="form-group">
+                        <label class="form-label">Reintentos</label>
+                        <input type="number" id="retryCount" class="form-input" min="0" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Reintentos por fragmento</label>
+                        <input type="number" id="fragmentRetries" class="form-input" min="0" value="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fragmentos concurrentes</label>
+                        <input type="number" id="concurrentFragments" class="form-input" min="1" value="1">
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>Archivo de historial</h3>
+                    <label class="inline-check">
+                        <input type="checkbox" id="useDownloadArchive" checked>
+                        <span>Evitar descargar dos veces el mismo video mediante archivo de historial</span>
+                    </label>
+                    <div class="form-group">
+                        <label class="form-label">Archivo de historial de descarga</label>
+                        <input type="text" id="archiveFile" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sleep entre descargas (s)</label>
+                        <input type="number" id="sleepInterval" class="form-input" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sleep maximo (s)</label>
+                        <input type="number" id="maxSleepInterval" class="form-input" min="0" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Mantenimiento</h2>
+            <p class="section-copy">Si borraste archivos manualmente y la app dice que ya estaban descargados, usa estas acciones para desbloquear nuevas descargas.</p>
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="clearArchiveOnly()">Permitir redescarga (limpiar archivo de descargas)</button>
+                <button class="btn btn-secondary" onclick="clearHistoryOnly()">Limpiar historial de la app</button>
+                <button class="btn btn-secondary" onclick="clearAllMaintenance()">Limpiar todo (historial + archivo de descargas)</button>
+                <button class="btn btn-secondary" onclick="removeLegacyMetadataJson()">Eliminar JSON de metadatos antiguos</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Guardar</h2>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="saveConfig()">Guardar configuracion</button>
+                <button class="btn btn-secondary" onclick="loadConfig()">Restaurar desde archivo</button>
+                <button class="btn btn-secondary" onclick="resetConfig()">Restablecer configuracion</button>
+                <a href="/" class="btn btn-secondary">Ir al descargador</a>
+            </div>
+            <div id="status" class="status"></div>
+        </div>
+    </div>
+
+    <script>
+        let cachedConfig = null;
+        const playlistFolderPresets = {
+            inherit: '',
+            one_folder: 'Playlists/{playlist_title}',
+            playlist_artist_album: 'Playlists/{playlist_title}/{artist}/{year} - {album}',
+            playlist_album: 'Playlists/{playlist_title}/{album_artist}/{year} - {album}',
+            by_artist: '{artist}/{year} - {album}',
+            by_album: '{album_artist}/{year} - {album}',
+            owner_playlist_artist: '{playlist_owner}/{playlist_title}/{artist}/{year} - {album}',
+        };
+        const previewSample = {
+            artist: 'Daft Punk',
+            album_artist: 'Daft Punk',
+            album: 'Random Access Memories',
+            title: 'Get Lucky',
+            year: '2013',
+            track: 3,
+            playlist_title: 'Road Trip 2026',
+            playlist_owner: 'DJ Noh',
+            playlist_track: 12
+        };
+
+        function setQuality(quality, evt) {
+            document.querySelectorAll('.quality-btn').forEach((b) => b.classList.remove('active'));
+            if (evt && evt.target) evt.target.classList.add('active');
+            document.getElementById('audioQuality').value = quality;
+        }
+
+        function showStatus(message, isError = false) {
+            const el = document.getElementById('status');
+            el.textContent = message || '';
+            el.style.color = isError ? '#9a1f1f' : '#226b2f';
+        }
+
+        function applyConfigToForm(config) {
+            if (!config || typeof config !== 'object') return;
+            document.getElementById('audioFormat').value = config.audio_format || 'mp3';
+            document.getElementById('audioQuality').value = config.audio_quality || '320';
+            document.querySelectorAll('.quality-btn').forEach((b) => b.classList.remove('active'));
+            document.querySelector(`.quality-btn[data-quality="${document.getElementById('audioQuality').value}"]`)?.classList.add('active');
+            document.getElementById('duplicateMode').value = config.duplicate_mode || 'skip';
+            document.getElementById('smartOrganize').checked = config.smart_organize !== false;
+            document.getElementById('embedLyrics').checked = config.embed_lyrics !== false;
+            document.getElementById('embedExtendedMetadata').checked = config.embed_extended_metadata !== false;
+            document.getElementById('downloadPath').value = config.download_path || '';
+            document.getElementById('folderStructure').value = config.folder_structure || '{artist}/{year} - {album}';
+            document.getElementById('playlistFolderMode').value = config.playlist_folder_mode || 'inherit';
+            document.getElementById('playlistFolderTemplate').value = config.playlist_folder_template || '';
+            document.getElementById('filenameFormat').value = config.filename_format || '{track:02d} - {title}';
+
+            document.getElementById('playlistTagAlbumMode').value = config.playlist_tag_album_mode || 'smart';
+            document.getElementById('playlistTagArtistMode').value = config.playlist_tag_artist_mode || 'detected';
+            document.getElementById('playlistTagAlbumArtistMode').value = config.playlist_tag_album_artist_mode || 'playlist_owner';
+            document.getElementById('playlistTrackNumberMode').value = config.playlist_track_number_mode || 'album';
+            document.getElementById('playlistTagGenreMode').value = config.playlist_tag_genre_mode || 'empty';
+            document.getElementById('playlistDefaultGenre').value = config.playlist_default_genre || '';
+            const metadata = config.metadata_defaults || {};
+            document.getElementById('metadataComposer').value = metadata.composer || '';
+            document.getElementById('metadataPublisher').value = metadata.publisher || '';
+            document.getElementById('metadataCopyright').value = metadata.copyright || '';
+            document.getElementById('metadataLanguage').value = metadata.language || '';
+            document.getElementById('metadataComment').value = metadata.comment || '';
+            document.getElementById('metadataBpm').value = metadata.bpm || '';
+            document.getElementById('metadataDisc').value = metadata.disc || '';
+            document.getElementById('metadataDiscTotal').value = metadata.disc_total || '';
+            document.getElementById('metadataTrackTotal').value = metadata.track_total || '';
+            document.getElementById('metadataIsrc').value = metadata.isrc || '';
+            document.getElementById('metadataGrouping').value = metadata.grouping || '';
+            document.getElementById('metadataReleaseType').value = metadata.release_type || '';
+            document.getElementById('metadataReleaseCountry').value = metadata.release_country || '';
+            document.getElementById('metadataReleaseStatus').value = metadata.release_status || '';
+            document.getElementById('metadataCatalogNumber').value = metadata.catalog_number || '';
+            document.getElementById('metadataBarcode').value = metadata.barcode || '';
+            document.getElementById('metadataMood').value = metadata.mood || '';
+            document.getElementById('metadataCompilation').checked = metadata.compilation === true;
+            document.getElementById('metadataExplicit').checked = metadata.explicit === true;
+
+            document.getElementById('cookiesFromBrowser').value = config.cookies_from_browser || '';
+            document.getElementById('cookiesProfile').value = config.cookies_profile || '';
+            document.getElementById('useDownloadArchive').checked = config.use_download_archive !== false;
+            document.getElementById('archiveFile').value = config.archive_file || '';
+            document.getElementById('youtubePlayerClient').value = config.youtube_player_client || 'default,web_music';
+            document.getElementById('retryCount').value = config.retry_count ?? 10;
+            document.getElementById('fragmentRetries').value = config.fragment_retries ?? 10;
+            document.getElementById('concurrentFragments').value = config.concurrent_fragments ?? 1;
+            document.getElementById('sleepInterval').value = config.sleep_interval ?? 0;
+            document.getElementById('maxSleepInterval').value = config.max_sleep_interval ?? 0;
+            updatePlaylistTemplateState();
+            updateStructurePreview();
+        }
+
+        function getFormConfig() {
+            return {
+                audio_format: document.getElementById('audioFormat').value,
+                audio_quality: document.getElementById('audioQuality').value,
+                duplicate_mode: document.getElementById('duplicateMode').value,
+                smart_organize: document.getElementById('smartOrganize').checked,
+                embed_lyrics: document.getElementById('embedLyrics').checked,
+                embed_extended_metadata: document.getElementById('embedExtendedMetadata').checked,
+                download_path: document.getElementById('downloadPath').value,
+                folder_structure: document.getElementById('folderStructure').value,
+                playlist_folder_mode: document.getElementById('playlistFolderMode').value,
+                playlist_folder_template: document.getElementById('playlistFolderTemplate').value,
+                filename_format: document.getElementById('filenameFormat').value,
+
+                playlist_tag_album_mode: document.getElementById('playlistTagAlbumMode').value,
+                playlist_tag_artist_mode: document.getElementById('playlistTagArtistMode').value,
+                playlist_tag_album_artist_mode: document.getElementById('playlistTagAlbumArtistMode').value,
+                playlist_track_number_mode: document.getElementById('playlistTrackNumberMode').value,
+                playlist_tag_genre_mode: document.getElementById('playlistTagGenreMode').value,
+                playlist_default_genre: document.getElementById('playlistDefaultGenre').value,
+                metadata_defaults: {
+                    composer: document.getElementById('metadataComposer').value,
+                    publisher: document.getElementById('metadataPublisher').value,
+                    copyright: document.getElementById('metadataCopyright').value,
+                    language: document.getElementById('metadataLanguage').value,
+                    comment: document.getElementById('metadataComment').value,
+                    bpm: document.getElementById('metadataBpm').value,
+                    disc: document.getElementById('metadataDisc').value,
+                    disc_total: document.getElementById('metadataDiscTotal').value,
+                    track_total: document.getElementById('metadataTrackTotal').value,
+                    isrc: document.getElementById('metadataIsrc').value,
+                    grouping: document.getElementById('metadataGrouping').value,
+                    release_type: document.getElementById('metadataReleaseType').value,
+                    release_country: document.getElementById('metadataReleaseCountry').value,
+                    release_status: document.getElementById('metadataReleaseStatus').value,
+                    catalog_number: document.getElementById('metadataCatalogNumber').value,
+                    barcode: document.getElementById('metadataBarcode').value,
+                    mood: document.getElementById('metadataMood').value,
+                    compilation: document.getElementById('metadataCompilation').checked,
+                    explicit: document.getElementById('metadataExplicit').checked
+                },
+
+                cookies_from_browser: document.getElementById('cookiesFromBrowser').value,
+                cookies_profile: document.getElementById('cookiesProfile').value,
+                use_download_archive: document.getElementById('useDownloadArchive').checked,
+                archive_file: document.getElementById('archiveFile').value,
+                youtube_player_client: document.getElementById('youtubePlayerClient').value,
+                retry_count: Number(document.getElementById('retryCount').value || 10),
+                fragment_retries: Number(document.getElementById('fragmentRetries').value || 10),
+                concurrent_fragments: Number(document.getElementById('concurrentFragments').value || 1),
+                sleep_interval: Number(document.getElementById('sleepInterval').value || 0),
+                max_sleep_interval: Number(document.getElementById('maxSleepInterval').value || 0)
+            };
+        }
+
+        function padNumber(value, size) {
+            const raw = String(Number(value) || 0);
+            return raw.padStart(size, '0');
+        }
+
+        function applyTemplate(template, data, fallback = 'Unknown') {
+            const source = (template || '').trim();
+            if (!source) return fallback;
+            return source.replace(/\{([a-zA-Z0-9_]+)(:[^}]+)?\}/g, (match, key, fmt) => {
+                const value = data[key];
+                if (value === undefined || value === null || value === '') return 'Unknown';
+                if (fmt === ':02d') return padNumber(value, 2);
+                return String(value);
+            });
+        }
+
+        function getPlaylistTemplate(form) {
+            const mode = (form.playlist_folder_mode || 'inherit').toLowerCase();
+            if (mode === 'inherit') return form.folder_structure || '{artist}/{year} - {album}';
+            if (mode === 'custom') return form.playlist_folder_template || form.folder_structure || '{artist}/{year} - {album}';
+            return playlistFolderPresets[mode] || form.folder_structure || '{artist}/{year} - {album}';
+        }
+
+        function updatePlaylistTemplateState() {
+            const mode = document.getElementById('playlistFolderMode').value;
+            const customInput = document.getElementById('playlistFolderTemplate');
+            customInput.disabled = mode !== 'custom';
+        }
+
+        function updateStructurePreview() {
+            const form = getFormConfig();
+            const basePath = (form.download_path || 'C:/Users/TuUsuario/Music/YouTube').trim();
+            const folderSingle = applyTemplate(form.folder_structure, previewSample, '{artist}/{year} - {album}');
+            const playlistTemplate = getPlaylistTemplate(form);
+            const folderPlaylist = applyTemplate(playlistTemplate, previewSample, '{artist}/{year} - {album}');
+            const fileName = applyTemplate(form.filename_format, previewSample, '{track:02d} - {title}');
+
+            document.getElementById('singlePreview').textContent = `Cancion individual -> ${basePath}/${folderSingle}/${fileName}.mp3`;
+            document.getElementById('playlistPreview').textContent = `Desde playlist -> ${basePath}/${folderPlaylist}/${fileName}.mp3`;
+        }
+
+        async function openDownloadFolder() {
+            const path = (document.getElementById('downloadPath').value || '').trim();
+            if (!path) {
+                showStatus('Define primero la carpeta de descarga.', true);
+                return;
+            }
+            try {
+                const res = await fetch('/api/open-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                showStatus('Carpeta abierta correctamente.');
+            } catch (e) {
+                showStatus(`No se pudo abrir la carpeta: ${e.message}`, true);
+            }
+        }
+
+        async function clearHistoryOnly() {
+            const ok = window.confirm('Se eliminara el historial visible de descargas de la app. Continuar?');
+            if (!ok) return;
+            showStatus('Limpiando historial...');
+            try {
+                const res = await fetch('/api/history/clear', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                showStatus('Historial limpiado correctamente.');
+            } catch (e) {
+                showStatus(`No se pudo limpiar historial: ${e.message}`, true);
+            }
+        }
+
+        async function clearArchiveOnly() {
+            const ok = window.confirm('Se limpiara el archivo de descargas previas para permitir redescargar contenido. Continuar?');
+            if (!ok) return;
+            showStatus('Limpiando archivo de descargas...');
+            try {
+                const res = await fetch('/api/archive/clear', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                showStatus('Archivo de descargas limpiado. Ya puedes redescargar.');
+            } catch (e) {
+                showStatus(`No se pudo limpiar archivo de descargas: ${e.message}`, true);
+            }
+        }
+
+        async function clearAllMaintenance() {
+            const ok = window.confirm('Se limpiaran historial y archivo de descargas. Continuar?');
+            if (!ok) return;
+            showStatus('Limpiando mantenimiento...');
+            try {
+                const res = await fetch('/api/maintenance/clear-all', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                showStatus('Limpieza completa realizada.');
+            } catch (e) {
+                showStatus(`No se pudo completar limpieza: ${e.message}`, true);
+            }
+        }
+
+        async function removeLegacyMetadataJson() {
+            const ok = window.confirm(
+                'Se eliminaran solamente archivos .info.json reconocidos como generados por YT-Descargar y que tengan su medio correspondiente. Continuar?'
+            );
+            if (!ok) return;
+            showStatus('Buscando JSON de metadatos antiguos...');
+            try {
+                const res = await fetch('/api/maintenance/remove-metadata-json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ confirm: true })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                showStatus(`Limpieza completada: ${data.removed || 0} archivo(s) JSON eliminado(s).`);
+            } catch (error) {
+                showStatus(error.message || 'No se pudo limpiar los JSON antiguos.', true);
+            }
+        }
+
+        async function loadConfig() {
+            showStatus('Cargando configuracion...');
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                cachedConfig = config;
+                applyConfigToForm(config);
+                showStatus('Configuracion cargada.');
+            } catch (e) {
+                showStatus(`Error al cargar: ${e.message}`, true);
+            }
+        }
+
+        async function saveConfig() {
+            showStatus('Guardando configuracion...');
+            try {
+                if (!cachedConfig) {
+                    const res = await fetch('/api/config');
+                    cachedConfig = await res.json();
+                }
+                const updated = { ...cachedConfig, ...getFormConfig() };
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updated)
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const payload = await res.json();
+                cachedConfig = payload.config || updated;
+                applyConfigToForm(cachedConfig);
+                showStatus('Configuracion guardada correctamente.');
+            } catch (e) {
+                showStatus(`Error al guardar: ${e.message}`, true);
+            }
+        }
+
+        async function resetConfig() {
+            const ok = window.confirm('Se restablecera toda la configuracion a valores predeterminados. Deseas continuar?');
+            if (!ok) return;
+            showStatus('Restableciendo configuracion...');
+            try {
+                const res = await fetch('/api/config/reset', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+                cachedConfig = data.config || null;
+                if (cachedConfig) applyConfigToForm(cachedConfig);
+                showStatus('Configuracion restablecida correctamente.');
+            } catch (e) {
+                showStatus(`Error al restablecer: ${e.message}`, true);
+            }
+        }
+
+        function bindPreviewEvents() {
+            const ids = [
+                'downloadPath',
+                'folderStructure',
+                'playlistFolderMode',
+                'playlistFolderTemplate',
+                'filenameFormat'
+            ];
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => {
+                    if (id === 'playlistFolderMode') updatePlaylistTemplateState();
+                    updateStructurePreview();
+                });
+                el.addEventListener('change', () => {
+                    if (id === 'playlistFolderMode') updatePlaylistTemplateState();
+                    updateStructurePreview();
+                });
+            });
+        }
+
+        window.addEventListener('load', () => {
+            bindPreviewEvents();
+            loadConfig();
+        });
+    </script>
+</body>
+</html>

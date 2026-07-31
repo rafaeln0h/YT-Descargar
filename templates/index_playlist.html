@@ -1,0 +1,3072 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT-Descargar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-top: #fff7ed;
+            --bg-mid: #ffe4d6;
+            --bg-bottom: #ffd7b8;
+            --ink: #211818;
+            --muted-ink: #6a5650;
+            --panel: rgba(255,255,255,.82);
+            --panel-strong: #ffffff;
+            --line: rgba(112, 74, 42, .14);
+            --accent: #d9485f;
+            --accent-2: #f59e0b;
+            --accent-3: #14532d;
+            --shadow-lg: 0 18px 60px rgba(104, 49, 23, .14);
+            --shadow-md: 0 10px 30px rgba(104, 49, 23, .10);
+        }
+        body {
+            font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,.72), transparent 34%),
+                radial-gradient(circle at right 18%, rgba(217,72,95,.14), transparent 26%),
+                linear-gradient(160deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .container {
+            width: 100%;
+            max-width: 1440px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, rgba(255,255,255,.88) 0%, rgba(255,247,237,.95) 100%);
+            border: 1px solid rgba(255,255,255,.65);
+            backdrop-filter: blur(14px);
+            border-radius: 28px;
+            padding: 32px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-lg);
+        }
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-copy { text-align: center; flex: 1; }
+        .suite-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 42px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 1px solid #ffd5c4;
+            background: rgba(255,255,255,.92);
+            color: #7c2d12;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            transition: all .2s ease;
+            white-space: nowrap;
+        }
+        .suite-link:hover {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+            border-color: transparent;
+            transform: translateY(-1px);
+        }
+        .settings-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            border: 1px solid #ffd5c4;
+            background: rgba(255,255,255,.92);
+            color: #7c2d12;
+            text-decoration: none;
+            transition: all .2s ease;
+        }
+        .settings-link:hover {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+            border-color: transparent;
+            transform: translateY(-1px);
+        }
+        .settings-link svg { width: 20px; height: 20px; }
+        .settings-spacer { width: 42px; height: 42px; }
+        .subtle-note {
+            font-size: 12px;
+            color: var(--muted-ink);
+            margin-top: 10px;
+        }
+        .header h1 { font-size: 34px; color: #2f1912; margin-bottom: 8px; letter-spacing: -.03em; }
+        .card {
+            background: linear-gradient(180deg, rgba(255,255,255,.94) 0%, rgba(255,251,248,.94) 100%);
+            border: 1px solid rgba(255,255,255,.7);
+            border-radius: 24px;
+            padding: 28px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-md);
+        }
+        .card h2 {
+            font-size: 20px;
+            color: #2b1d16;
+            margin-bottom: 15px;
+            border-bottom: 2px solid rgba(217,72,95,.18);
+            padding-bottom: 10px;
+        }
+        .url-input {
+            width: 100%;
+            padding: 16px 14px;
+            border: 2px solid #cfd6f7;
+            border-radius: 12px;
+            font-size: 15px;
+            margin-bottom: 0;
+            background: #ffffff;
+            transition: all .2s ease;
+        }
+        .url-input::placeholder { color: #8b92b5; }
+        .url-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #f8f9ff;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, .12);
+        }
+        .url-panel {
+            background: linear-gradient(180deg, #f7f9ff 0%, #f2f5ff 100%);
+            border: 1px solid #dce3ff;
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 10px;
+            position: sticky;
+            top: 10px;
+            z-index: 4;
+            transition: box-shadow .2s ease, border-color .2s ease, background .2s ease;
+        }
+        .url-panel.url-valid {
+            border-color: #7ad6a2;
+            background: linear-gradient(180deg, #f4fff8 0%, #ecfff4 100%);
+            box-shadow: 0 8px 24px rgba(58, 166, 107, .16);
+            animation: urlSuccessPulse .55s ease-out 1;
+        }
+        .url-panel.url-invalid {
+            border-color: #f3a3a3;
+            background: linear-gradient(180deg, #fff7f7 0%, #fff0f0 100%);
+        }
+        .url-input.url-valid {
+            border-color: #45ba7a;
+            background: #f5fff9;
+        }
+        .url-input.url-invalid {
+            border-color: #d26b6b;
+            background: #fff8f8;
+        }
+        @keyframes urlSuccessPulse {
+            0% { transform: translateY(0) scale(1); }
+            40% { transform: translateY(-1px) scale(1.003); }
+            100% { transform: translateY(0) scale(1); }
+        }
+        .url-detect-wrap {
+            display: grid;
+            grid-template-columns: 1fr 170px;
+            gap: 10px;
+            align-items: stretch;
+            margin-top: 8px;
+        }
+        .url-detect-btn {
+            width: 100%;
+            height: 100%;
+            min-height: 56px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .url-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .url-actions .btn {
+            border: 1px solid #cfd6f7;
+            background: white;
+            color: #2f3b73;
+        }
+        .url-tip {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #4a567f;
+            line-height: 1.4;
+        }
+        .url-preview {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #405079;
+            min-height: 20px;
+        }
+        .url-preview-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #b8c0df;
+            flex: 0 0 auto;
+        }
+        .url-preview.kind-valid .url-preview-dot { background: #37ad70; }
+        .url-preview.kind-invalid .url-preview-dot { background: #cb5d5d; }
+        .url-kind-badge {
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 700;
+            letter-spacing: .2px;
+            background: #e9eeff;
+            color: #32427f;
+        }
+        .url-tip code {
+            background: #e9efff;
+            border-radius: 6px;
+            padding: 2px 6px;
+            color: #293a7f;
+        }
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+            width: 100%;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(217, 72, 95, 0.28); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn-filter.active {
+            background: #dfe7ff;
+            color: #25356f;
+            border: 1px solid #b9c6ff;
+        }
+        .view-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .chip-btn {
+            border: 1px solid #cfd6f7;
+            background: #f6f8ff;
+            color: #2f3b73;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .chip-btn.active {
+            background: #667eea;
+            color: #fff;
+            border-color: #667eea;
+        }
+
+        .info-box {
+            background: #f0f0f0;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .video-list {
+            background: #f5f5f5;
+            border-radius: 8px;
+            height: var(--video-list-height, 560px);
+            min-height: 340px;
+            overflow-y: auto;
+            margin: 12px 0;
+            border: 1px solid #ddd;
+        }
+
+        .video-item {
+            display: grid;
+            grid-template-columns: 24px 72px 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        .video-item:last-child { border-bottom: none; }
+        .video-title { font-weight: 700; color: #333; }
+        .video-artist { color: #666; font-size: 13px; }
+        .video-thumb {
+            width: 72px;
+            height: 72px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #fde68a 0%, #fb7185 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .video-thumb-placeholder {
+            width: 72px;
+            height: 72px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            font-size: 11px;
+            font-weight: 800;
+            color: #7c2d12;
+            background: linear-gradient(135deg, #ffe8d6 0%, #ffd4d4 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            padding: 12px;
+        }
+        .video-card {
+            border: 1px solid #d9def5;
+            border-radius: 10px;
+            background: #fff;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 24px 72px 1fr;
+            gap: 10px;
+            min-height: 90px;
+        }
+        .video-card .video-title {
+            font-size: 14px;
+            line-height: 1.3;
+            margin-bottom: 4px;
+        }
+        .meta-row {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 4px;
+        }
+        .group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #eef2ff;
+            border-bottom: 1px solid #cfd8ff;
+            font-size: 12px;
+            font-weight: 700;
+            color: #2b3a7d;
+        }
+        .group-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .group-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .item-badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #e3f2fd;
+            color: #0d47a1;
+            font-weight: 700;
+        }
+
+        .item-badge.collection { background: #ede7f6; color: #4527a0; }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .dynamic-toolbar {
+            align-items: center;
+            justify-content: space-between;
+            background: #f8f9ff;
+            border: 1px solid #dde3ff;
+            border-radius: 8px;
+            padding: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        .search-input {
+            flex: 1;
+            min-width: 220px;
+            border: 1px solid #c8d2ff;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 14px;
+            background: white;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102,126,234,.15);
+        }
+        .height-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #334;
+            white-space: nowrap;
+        }
+        .height-control input[type='range'] { width: 140px; }
+
+        .progress-section { display: none; margin: 20px 0; }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text { font-size: 13px; color: #666; margin: 10px 0; }
+
+        .logs {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        .log-line { margin-bottom: 3px; }
+
+        .hidden { display: none; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 1180px) { .grid-2 { grid-template-columns: minmax(0, 1fr); } }
+        @media (max-width: 900px) {
+            body { padding: 12px; }
+            .card { padding: 16px; }
+            .url-detect-wrap { grid-template-columns: 1fr; }
+            .url-detect-btn { min-height: 48px; }
+            .url-panel {
+                position: static;
+                top: auto;
+            }
+        }
+
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; margin-bottom: 6px; font-weight: 600; color: #333; font-size: 13px; }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .badge-playlist { background: #f3e5f5; color: #7b1fa2; }
+        .badge-video { background: #e3f2fd; color: #1976d2; }
+        .badge-artist { background: #e8f5e9; color: #1b5e20; }
+
+        .muted { color: #666; font-size: 12px; }
+        .inline-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #333; }
+
+        .hero-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, .95fr);
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+        .hero-panel {
+            background: linear-gradient(135deg, rgba(40,22,17,.96) 0%, rgba(95,45,18,.92) 55%, rgba(217,72,95,.88) 100%);
+            color: #fff5ef;
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-panel::after {
+            content: "";
+            position: absolute;
+            inset: auto -80px -80px auto;
+            width: 240px;
+            height: 240px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 70%);
+        }
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.12);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 16px;
+        }
+        .hero-panel h2 {
+            border: 0;
+            color: #fff9f5;
+            font-size: 40px;
+            line-height: 1.02;
+            margin-bottom: 12px;
+            padding: 0;
+        }
+        .hero-panel p {
+            color: rgba(255,245,239,.84);
+            font-size: 15px;
+            max-width: 700px;
+            line-height: 1.6;
+        }
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .metric-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.16);
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: 800;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: rgba(255,245,239,.8);
+            line-height: 1.4;
+        }
+        .insight-panel {
+            background: linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,247,242,.96) 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+            border-radius: 28px;
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+        }
+        .insight-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #8a3412;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 12px;
+        }
+        .capability-list {
+            display: grid;
+            gap: 12px;
+        }
+        .capability-item {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .capability-item strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #35231b;
+        }
+        .capability-item span {
+            font-size: 13px;
+            color: var(--muted-ink);
+            line-height: 1.5;
+        }
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .tool-card {
+            padding: 16px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .tool-card h3 {
+            font-size: 15px;
+            color: #36231a;
+            margin-bottom: 6px;
+        }
+        .tool-card p {
+            font-size: 13px;
+            color: var(--muted-ink);
+            line-height: 1.5;
+        }
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .preset-card {
+            border-radius: 18px;
+            padding: 16px;
+            background: linear-gradient(180deg, #fff 0%, #fff7f2 100%);
+            border: 1px solid rgba(137, 77, 47, .12);
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        .preset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 26px rgba(132, 73, 40, .12);
+        }
+        .preset-card.active {
+            border-color: rgba(217,72,95,.55);
+            box-shadow: 0 14px 32px rgba(217,72,95,.14);
+        }
+        .preset-card strong {
+            display: block;
+            font-size: 15px;
+            color: #351d18;
+            margin-bottom: 6px;
+        }
+        .preset-card small {
+            display: block;
+            color: var(--muted-ink);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .mode-panel {
+            display: grid;
+            grid-template-columns: 1.15fr .85fr .85fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .mode-box {
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+            padding: 14px;
+        }
+        .mode-box label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #6d3d2c;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .mode-toggles {
+            display: flex;
+            gap: 8px;
+        }
+        .mode-toggle {
+            flex: 1;
+            border: 1px solid #ffd1c3;
+            background: #fff5f0;
+            color: #7a2f17;
+            border-radius: 14px;
+            padding: 11px 12px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .mode-toggle.active {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+            border-color: transparent;
+        }
+        .mode-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #fff4ec 0%, #fff9f5 100%);
+            border: 1px solid rgba(217,72,95,.16);
+            margin-bottom: 16px;
+        }
+        .mode-summary strong { color: #531d1d; }
+        .mode-summary span { color: var(--muted-ink); font-size: 13px; }
+        .mode-summary-badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(217,72,95,.12);
+            color: #a61e4d;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+        .smart-tools {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .smart-tool {
+            border-radius: 18px;
+            padding: 14px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .smart-tool strong {
+            display: block;
+            color: #3b281e;
+            margin-bottom: 5px;
+        }
+        .smart-tool p {
+            font-size: 12px;
+            color: var(--muted-ink);
+            line-height: 1.5;
+        }
+        .hint {
+            color: var(--muted-ink);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .bulk-panel {
+            border-radius: 20px;
+            padding: 16px;
+            background: linear-gradient(135deg, #fff8f3 0%, #ffffff 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+            margin: 16px 0;
+        }
+        .bulk-panel textarea {
+            width: 100%;
+            min-height: 120px;
+            resize: vertical;
+            border: 1px solid #d9def5;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font: inherit;
+            background: #fff;
+        }
+        .bulk-panel textarea:focus {
+            outline: none;
+            border-color: #d9485f;
+            box-shadow: 0 0 0 3px rgba(217,72,95,.12);
+        }
+        .quick-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 18px 0 14px;
+        }
+        .quick-tab {
+            border: 1px solid #ffd1c3;
+            background: #fff7f2;
+            color: #7a2f17;
+            border-radius: 999px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .quick-tab.active {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: white;
+            border-color: transparent;
+        }
+        .detect-preview-card {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 16px;
+            align-items: stretch;
+            border-radius: 20px;
+            padding: 16px;
+            background: linear-gradient(135deg, #fff8f3 0%, #ffffff 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+            margin-top: 12px;
+        }
+        .detect-preview-card img,
+        .detect-preview-card .preview-fallback {
+            width: 120px;
+            height: 120px;
+            border-radius: 18px;
+            object-fit: cover;
+        }
+        .detect-preview-card .preview-fallback {
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #f59e0b 0%, #d9485f 100%);
+            color: white;
+            font-size: 12px;
+            font-weight: 800;
+            text-align: center;
+            padding: 14px;
+        }
+        .detect-preview-copy strong {
+            display: block;
+            font-size: 18px;
+            color: #311b14;
+            margin-bottom: 8px;
+        }
+        .detect-preview-copy p {
+            font-size: 13px;
+            color: var(--muted-ink);
+            line-height: 1.55;
+        }
+        .detect-preview-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .detect-meta-pill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+            font-size: 11px;
+            font-weight: 700;
+            color: #7a4332;
+        }
+        .queue-history-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
+            gap: 20px;
+        }
+        .queue-panel-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .queue-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .queue-list,
+        .history-list {
+            display: grid;
+            gap: 12px;
+            max-height: 560px;
+            overflow-y: auto;
+        }
+        .queue-item-card,
+        .history-card {
+            border-radius: 18px;
+            padding: 14px;
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .queue-item-body,
+        .history-body {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            gap: 12px;
+        }
+        .queue-mini-thumb,
+        .history-mini-thumb {
+            width: 70px;
+            height: 70px;
+            border-radius: 14px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #ffe29a 0%, #fb7185 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .queue-mini-fallback,
+        .history-mini-fallback {
+            width: 70px;
+            height: 70px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, #ffe8d6 0%, #ffd4d4 100%);
+            color: #7c2d12;
+            font-size: 10px;
+            font-weight: 800;
+            text-align: center;
+            padding: 8px;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .queue-item-card.active {
+            border-color: rgba(217,72,95,.45);
+            box-shadow: 0 10px 24px rgba(217,72,95,.10);
+        }
+        .queue-item-top,
+        .history-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .queue-item-title,
+        .history-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #35231b;
+        }
+        .queue-item-sub,
+        .history-sub {
+            font-size: 12px;
+            color: var(--muted-ink);
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+        .status-chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .status-chip.pendiente { background: #fff2cc; color: #8a5800; }
+        .status-chip.procesando { background: #e0ecff; color: #2346a5; }
+        .status-chip.completado { background: #def7e5; color: #17663a; }
+        .status-chip.error { background: #ffe1e1; color: #9d1f1f; }
+        .status-chip.cancelado { background: #f6e3e3; color: #8f2d2d; }
+        .status-chip.pausado { background: #ede7ff; color: #5b33a3; }
+        .status-chip.iniciando,
+        .status-chip.analizando,
+        .status-chip.descargando { background: #e8f0ff; color: #2948a8; }
+        .mini-progress {
+            width: 100%;
+            height: 7px;
+            background: #f0ece8;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .mini-progress > span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            width: 0%;
+        }
+        .meta-line {
+            font-size: 12px;
+            color: var(--muted-ink);
+            line-height: 1.6;
+            margin-top: 8px;
+            word-break: break-word;
+        }
+        .queue-empty,
+        .history-empty {
+            border-radius: 18px;
+            padding: 18px;
+            background: #fff7f2;
+            border: 1px dashed rgba(137, 77, 47, .18);
+            color: var(--muted-ink);
+            font-size: 13px;
+        }
+        @media (max-width: 1180px) {
+            .hero-shell { grid-template-columns: 1fr; }
+            .mode-panel { grid-template-columns: 1fr; }
+            .queue-history-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 900px) {
+            .hero-panel h2 { font-size: 30px; }
+            .hero-metrics { grid-template-columns: 1fr; }
+            .tool-grid, .smart-tools { grid-template-columns: 1fr; }
+            .detect-preview-card { grid-template-columns: 1fr; }
+            .detect-preview-card img,
+            .detect-preview-card .preview-fallback { width: 100%; height: 200px; }
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mini-player.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-top">
+                <div class="settings-spacer"></div>
+                <div class="header-copy">
+                    <h1>YT-Descargar</h1>
+                    <p>Descargas autorizadas, biblioteca local y metadatos trazables en una experiencia accesible</p>
+                </div>
+                <div class="header-actions">
+                    <a class="suite-link" href="/suite">Suite</a>
+                    <a class="settings-link" href="/settings" title="Abrir configuracion" aria-label="Abrir configuracion">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M10.325 4.317a1 1 0 0 1 .95-.69h1.45a1 1 0 0 1 .95.69l.318.979a1 1 0 0 0 .95.69h1.03a1 1 0 0 1 .832.445l.805 1.2a1 1 0 0 1-.103 1.219l-.734.826a1 1 0 0 0-.22 1.031l.357 1.098a1 1 0 0 0 .95.69h.975a1 1 0 0 1 .95.69l.45 1.384a1 1 0 0 1-.366 1.118l-1.15.836a1 1 0 0 0-.365 1.118l.36 1.11a1 1 0 0 1-.366 1.118l-1.176.854a1 1 0 0 1-1.176 0l-.98-.712a1 1 0 0 0-1.176 0l-.98.712a1 1 0 0 1-1.176 0l-1.176-.854a1 1 0 0 1-.366-1.118l.36-1.11a1 1 0 0 0-.365-1.118l-1.15-.836a1 1 0 0 1-.366-1.118l.45-1.384a1 1 0 0 1 .95-.69h.975a1 1 0 0 0 .95-.69l.357-1.098a1 1 0 0 0-.22-1.031l-.734-.826a1 1 0 0 1-.103-1.219l.805-1.2a1 1 0 0 1 .832-.445h1.03a1 1 0 0 0 .95-.69l.318-.98Z" stroke="currentColor" stroke-width="1.2"/>
+                            <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.2"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h2>Ingresa URL</h2>
+
+                <div class="preset-grid">
+                    <button class="preset-card active" type="button" data-preset="mp3" onclick="applyPreset('mp3')">
+                        <strong>Preset MP3</strong>
+                        <small>Rapido para musica, biblioteca local y reproductores tradicionales.</small>
+                    </button>
+                    <button class="preset-card" type="button" data-preset="m4a" onclick="applyPreset('m4a')">
+                        <strong>Preset M4A</strong>
+                        <small>Audio mas directo y ligero, ideal si quieres menor reprocesado.</small>
+                    </button>
+                    <button class="preset-card" type="button" data-preset="mp4-720" onclick="applyPreset('mp4-720')">
+                        <strong>Preset MP4 HD</strong>
+                        <small>Video compatible en 720p con un solo clic.</small>
+                    </button>
+                    <button class="preset-card" type="button" data-preset="mp4-1080" onclick="applyPreset('mp4-1080')">
+                        <strong>Preset MP4 Full HD</strong>
+                        <small>Video 1080p con subtitulos opcionales.</small>
+                    </button>
+                </div>
+
+                <div class="mode-summary" id="modeSummary">
+                    <div>
+                        <strong>Modo actual: Audio MP3 320 kbps</strong>
+                        <span>Ideal para playlists musicales y biblioteca organizada.</span>
+                    </div>
+                    <div class="mode-summary-badge" id="modeBadge">audio</div>
+                </div>
+
+                <div class="mode-panel">
+                    <div class="mode-box">
+                        <label>Modo de descarga</label>
+                        <div class="mode-toggles">
+                            <button class="mode-toggle active" type="button" data-mode="audio" onclick="setDownloadMode('audio')">Audio</button>
+                            <button class="mode-toggle" type="button" data-mode="video" onclick="setDownloadMode('video')">Video</button>
+                        </div>
+                    </div>
+                    <div class="mode-box">
+                        <label>Formato</label>
+                        <select id="formatSelect" class="form-select" onchange="handleFormatChange()">
+                            <option value="mp3">MP3</option>
+                            <option value="m4a">M4A</option>
+                            <option value="mp4">MP4</option>
+                            <option value="mkv">MKV</option>
+                        </select>
+                    </div>
+                    <div class="mode-box">
+                        <label>Calidad / Resolucion</label>
+                        <select id="qualitySelect" class="form-select" onchange="handleQualityChange()">
+                            <option value="320">320 kbps</option>
+                            <option value="256">256 kbps</option>
+                            <option value="192">192 kbps</option>
+                            <option value="1080">1080p</option>
+                            <option value="720">720p</option>
+                            <option value="480">480p</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="quick-tabs">
+                    <button class="quick-tab active" type="button" data-quick-type="auto" onclick="setQuickTab('auto')">Auto</button>
+                    <button class="quick-tab" type="button" data-quick-type="video" onclick="setQuickTab('video')">Forzar canción</button>
+                    <button class="quick-tab" type="button" data-quick-type="playlist" onclick="setQuickTab('playlist')">Forzar playlist</button>
+                    <button class="quick-tab" type="button" data-quick-type="channel" onclick="setQuickTab('channel')">Forzar canal</button>
+                </div>
+                <div class="hint" style="margin: 0 0 14px 2px;">La app detecta el tipo de enlace automaticamente. Solo usa estas opciones si necesitas corregir la deteccion de forma manual.</div>
+
+                <div class="bulk-panel">
+                    <div class="form-label">Carga masiva de URLs</div>
+                    <textarea id="bulkUrlInput" placeholder="Pega varias URLs de YouTube o YouTube Music, una por linea..."></textarea>
+                    <div class="queue-actions">
+                        <button class="btn btn-secondary" type="button" onclick="detectFirstBulkUrl()">Usar la primera URL</button>
+                        <button class="btn btn-primary" type="button" onclick="enqueueBulkUrls()">Agregar todas a la cola</button>
+                    </div>
+                </div>
+
+                <div class="url-panel">
+                    <div class="form-group">
+                        <label class="form-label">YouTube / YouTube Music</label>
+                        <div class="url-detect-wrap">
+                            <input type="text" id="urlInput" class="url-input" placeholder="Ej: https://music.youtube.com/channel/...">
+                            <button class="btn btn-primary url-detect-btn" id="detectBtn" onclick="detectURL()">Detectar</button>
+                        </div>
+                    </div>
+                    <div class="url-actions">
+                        <button class="btn btn-secondary" type="button" onclick="pasteUrlFromClipboard()">Pegar enlace</button>
+                        <button class="btn btn-secondary" type="button" onclick="clearUrlInput()">Limpiar</button>
+                    </div>
+                    <div class="url-preview" id="urlPreview">
+                        <span class="url-preview-dot"></span>
+                        <span>Esperando enlace...</span>
+                    </div>
+                    <div class="url-tip">
+                        Soporta links de <code>music.youtube.com</code>, <code>youtube.com</code> y <code>youtu.be</code>.
+                        Puedes pegar y presionar Enter para detectar.
+                    </div>
+                </div>
+
+                <div id="urlInfo" class="hidden" style="margin-top: 15px;">
+                    <div id="urlBadge" class="badge"></div>
+                    <div id="typeInfo" class="info-box"></div>
+                    <div id="detectedPreview" class="hidden"></div>
+
+                    <div id="videoListSection" class="hidden">
+                        <div class="form-label">Contenido a descargar</div>
+                        <div class="toolbar">
+                            <button class="btn btn-secondary btn-filter" data-filter="all" onclick="applySelectionFilter('all')">Seleccionar todo</button>
+                            <button class="btn btn-secondary" onclick="selectAllItems(false)">Limpiar seleccion</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="collection" onclick="applySelectionFilter('collection')">Solo albums/colecciones</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="song" onclick="applySelectionFilter('song')">Solo canciones</button>
+                            <button class="btn btn-secondary" onclick="selectCompleteAlbums()">Seleccionar albums completos</button>
+                        </div>
+                        <div class="toolbar view-controls">
+                            <button class="chip-btn" data-view="list" onclick="setViewMode('list')">Vista lista</button>
+                            <button class="chip-btn" data-view="grouped" onclick="setViewMode('grouped')">Vista agrupada</button>
+                            <button class="chip-btn" data-view="grid" onclick="setViewMode('grid')">Vista cuadrícula</button>
+                            <select id="displayFilter" class="form-select" style="max-width: 230px;" onchange="setDisplayFilter(this.value)">
+                                <option value="all">Mostrar: Todo</option>
+                                <option value="collection">Mostrar: Solo albumes/colecciones</option>
+                                <option value="song">Mostrar: Solo canciones</option>
+                            </select>
+                        </div>
+                        <div class="toolbar dynamic-toolbar">
+                            <input id="itemSearch" class="search-input" type="text" placeholder="Buscar por titulo, artista o album...">
+                            <div class="height-control">
+                                <span>Altura</span>
+                                <input id="listHeightRange" type="range" min="360" max="900" step="20" value="560">
+                                <span id="listHeightLabel">560px</span>
+                            </div>
+                        </div>
+                        <div class="video-list" id="videoList"></div>
+                        <small id="videoCount" class="muted"></small>
+                    </div>
+
+                    <div id="manualSection" class="hidden">
+                        <div class="form-group">
+                            <label class="form-label">Artista</label>
+                            <input type="text" id="artistInput" class="form-input" placeholder="Ej: The Beatles">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Album</label>
+                            <input type="text" id="albumInput" class="form-input" placeholder="Ej: Abbey Road">
+                        </div>
+                        <details class="form-group">
+                            <summary class="form-label" style="cursor:pointer;">Etiquetas avanzadas de esta descarga</summary>
+                            <div class="advanced-tag-grid" style="margin-top:12px;">
+                                <div>
+                                    <label class="form-label">Genero</label>
+                                    <input type="text" id="genreInput" class="form-input" placeholder="Rock">
+                                </div>
+                                <div>
+                                    <label class="form-label">Compositor</label>
+                                    <input type="text" id="composerInput" class="form-input" placeholder="Nombre del compositor">
+                                </div>
+                                <div>
+                                    <label class="form-label">Año</label>
+                                    <input type="number" id="yearInput" class="form-input" min="1000" max="9999">
+                                </div>
+                                <div>
+                                    <label class="form-label">Pista / total</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                        <input type="number" id="trackInput" class="form-input" min="1" value="1">
+                                        <input type="number" id="trackTotalInput" class="form-input" min="0" placeholder="Total">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Disco / total</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                        <input type="number" id="discInput" class="form-input" min="0" placeholder="1">
+                                        <input type="number" id="discTotalInput" class="form-input" min="0" placeholder="1">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Idioma</label>
+                                    <input type="text" id="languageInput" class="form-input" placeholder="es">
+                                </div>
+                                <div>
+                                    <label class="form-label">Sello / editorial</label>
+                                    <input type="text" id="publisherInput" class="form-input" placeholder="Nombre del sello">
+                                </div>
+                                <div>
+                                    <label class="form-label">ISRC</label>
+                                    <input type="text" id="isrcInput" class="form-input" placeholder="Codigo ISRC">
+                                </div>
+                                <div>
+                                    <label class="form-label">Catalogo / codigo de barras</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                        <input type="text" id="catalogNumberInput" class="form-input" placeholder="CAT-001">
+                                        <input type="text" id="barcodeInput" class="form-input" placeholder="UPC / EAN">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Tipo / pais del lanzamiento</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                        <input type="text" id="releaseTypeInput" class="form-input" placeholder="Single">
+                                        <input type="text" id="releaseCountryInput" class="form-input" placeholder="MX">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label">Estado / animo</label>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                                        <input type="text" id="releaseStatusInput" class="form-input" placeholder="Official">
+                                        <input type="text" id="moodInput" class="form-input" placeholder="Chill">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-top:10px;">
+                                <label class="form-label">Comentario</label>
+                                <input type="text" id="commentInput" class="form-input" placeholder="Nota opcional para el archivo">
+                            </div>
+                        </details>
+                    </div>
+
+                    <div id="playlistFolderSection" class="hidden">
+                        <div class="form-group">
+                            <label class="form-label">Organizacion de playlists</label>
+                            <select id="playlistFolderMode" class="form-select">
+                                <option value="inherit">Heredar plantilla general</option>
+                                <option value="one_folder">Todo en una sola carpeta por playlist</option>
+                                <option value="playlist_artist_album">Playlist / artista / album</option>
+                                <option value="playlist_album">Playlist / album</option>
+                                <option value="by_artist">Biblioteca por artista</option>
+                                <option value="by_album">Biblioteca por album</option>
+                                <option value="owner_playlist_artist">Canal playlist / playlist / artista</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                            <small class="muted">Este modo se aplica solo a playlists/canales en esta descarga.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Plantilla personalizada playlist</label>
+                            <input type="text" id="playlistFolderTemplate" class="form-input" placeholder="Ej: Playlists/{playlist_title}/{artist}/{year} - {album}">
+                            <small class="muted">Variables: {playlist_title}, {playlist_owner}, {artist}, {album_artist}, {album}, {year}, {playlist_track}</small>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 14px;">
+                        <label class="inline-check" style="margin-bottom: 8px;">
+                            <input type="checkbox" id="forceRedownload">
+                            <span>Forzar redescarga (ignorar historial de descargas previas)</span>
+                        </label>
+                        <label class="inline-check" style="margin-bottom: 8px;">
+                            <input type="checkbox" id="writeSubtitles">
+                            <span>Guardar subtitulos cuando existan</span>
+                        </label>
+                        <label class="inline-check" style="margin-bottom: 12px;">
+                            <input type="checkbox" id="embedSubtitles">
+                            <span>Incrustar subtitulos en video cuando sea posible</span>
+                        </label>
+                        <div class="queue-actions">
+                            <button class="btn btn-secondary" id="queueBtn" onclick="enqueueCurrentDownload()" disabled>Agregar a cola</button>
+                            <button class="btn btn-primary" id="downloadBtn" onclick="startDownload()" disabled>Descargar ahora</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Progreso y Logs</h2>
+
+            <div id="progressSection" class="progress-section">
+                <div class="progress-text" id="progressText">Descargando...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <div class="logs" id="logs">
+                <div class="log-line">[OK] Sistema listo. Ingresa una URL para comenzar.</div>
+            </div>
+
+            <button class="btn btn-secondary" style="margin-top: 10px;" onclick="clearLogs()">Limpiar</button>
+        </div>
+
+        <div class="queue-history-grid">
+            <div class="card">
+                <div class="queue-panel-title">
+                    <h2>Cola Multiple</h2>
+                    <small class="muted" id="queueMeta">0 tareas pendientes</small>
+                </div>
+                <div id="queueList" class="queue-list"></div>
+                <div class="queue-actions">
+                    <button class="btn btn-primary" type="button" onclick="startQueuedDownloads()">Iniciar cola</button>
+                    <button class="btn btn-secondary" type="button" onclick="retryFailedQueueJobs()">Reintentar fallidos</button>
+                    <button class="btn btn-secondary" type="button" onclick="clearPendingQueue()">Limpiar pendientes</button>
+                    <button class="btn btn-secondary" type="button" onclick="refreshQueuePanels()">Actualizar</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="queue-panel-title">
+                    <h2>Historial de Descargas</h2>
+                    <small class="muted">Estado y carpeta destino</small>
+                </div>
+                <div id="historyList" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <section class="mini-player" id="miniPlayer" hidden aria-label="Minirreproductor">
+        <div class="mini-player-copy">
+            <span class="mini-player-kicker">Reproduciendo desde tu biblioteca</span>
+            <div class="mini-player-title" id="miniPlayerTitle">Sin seleccion</div>
+            <div class="mini-player-subtitle" id="miniPlayerSubtitle"></div>
+        </div>
+        <div class="mini-player-media">
+            <audio id="miniPlayerAudio" controls preload="metadata"></audio>
+            <video id="miniPlayerVideo" controls preload="metadata" hidden></video>
+        </div>
+        <div class="mini-player-actions">
+            <button class="mini-player-button" id="libraryToggle" type="button">Biblioteca</button>
+            <button class="mini-player-button" id="miniPlayerClose" type="button">Cerrar</button>
+        </div>
+    </section>
+    <button class="library-launcher" id="libraryToggleLauncher" type="button">♪ Biblioteca</button>
+
+    <aside class="library-drawer" id="libraryDrawer" hidden aria-label="Biblioteca local">
+        <div class="library-drawer-head">
+            <div>
+                <h2>Biblioteca local</h2>
+                <small id="libraryCount">Actualizando...</small>
+            </div>
+            <button class="mini-player-button" id="libraryClose" type="button" style="color:#7c2d12;background:#fff4ec;">Cerrar</button>
+        </div>
+        <div class="library-drawer-tools">
+            <input class="library-search" id="librarySearch" type="search" placeholder="Buscar titulo, artista o album...">
+            <button class="mini-player-button" id="libraryRefresh" type="button" style="color:#7c2d12;background:#fff4ec;">Actualizar</button>
+        </div>
+        <div class="library-list" id="libraryList"></div>
+    </aside>
+
+    <script>
+        let currentQueueId = null;
+        let statusCheckInterval = null;
+        let currentUrlType = null;
+        let currentVideos = [];
+        let currentDetected = null;
+        let viewMode = 'list';
+        let displayFilter = 'all';
+        let currentSelectionFilter = 'all';
+        let currentSearchTerm = '';
+        let listHeightPx = 560;
+        let cachedConfig = null;
+        let quickTab = 'auto';
+        let pendingDownloadQueue = [];
+        let queueUiSeq = 0;
+        let activeQueueUiId = null;
+        let remoteQueueItems = [];
+        let historyItems = [];
+        let lastMonitoredStatus = '';
+        const retryInFlight = new Set();
+        let runtimeConfig = {
+            download_mode: 'audio',
+            audio_format: 'mp3',
+            audio_quality: '320',
+            video_format: 'mp4',
+            video_quality: '1080',
+            folder_structure: '{artist}/{year} - {album}',
+            playlist_folder_mode: 'inherit',
+            playlist_folder_template: '',
+            filename_format: '{track:02d} - {title}',
+            duplicate_mode: 'skip',
+            smart_organize: true,
+            embed_lyrics: true,
+            write_subtitles: false,
+            embed_subtitles: false
+        };
+
+        function addLog(message) {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.textContent = `[${time}] ${message}`;
+            logs.appendChild(line);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '<div class="log-line">[OK] Logs limpios</div>';
+        }
+
+        function escapeHtml(value) {
+            return (value || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatStatusLabel(status) {
+            const map = {
+                pending: 'pendiente',
+                queued: 'pendiente',
+                processing: 'procesando',
+                completado: 'completado',
+                error: 'error',
+                cancelado: 'cancelado',
+                paused: 'pausado',
+                pausado: 'pausado',
+                iniciando: 'iniciando',
+                analizando: 'analizando',
+                descargando: 'descargando'
+            };
+            return map[status] || status || 'pendiente';
+        }
+
+        function renderThumb(url, alt = 'preview') {
+            if (url) {
+                return `<img class="video-thumb" src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" referrerpolicy="no-referrer">`;
+            }
+            return `<div class="video-thumb-placeholder">SIN PREVIEW</div>`;
+        }
+
+        function renderLargeThumb(url, label = 'Vista previa') {
+            if (url) {
+                return `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" referrerpolicy="no-referrer">`;
+            }
+            return `<div class="preview-fallback">${escapeHtml(label)}</div>`;
+        }
+
+        function renderMiniThumb(url, label = 'Preview', kind = 'queue') {
+            const imgClass = kind === 'history' ? 'history-mini-thumb' : 'queue-mini-thumb';
+            const fallbackClass = kind === 'history' ? 'history-mini-fallback' : 'queue-mini-fallback';
+            if (url) {
+                return `<img class="${imgClass}" src="${escapeHtml(url)}" alt="${escapeHtml(label)}" loading="lazy" referrerpolicy="no-referrer">`;
+            }
+            return `<div class="${fallbackClass}">${escapeHtml(label)}</div>`;
+        }
+
+        function updateModeSummary() {
+            const summary = document.getElementById('modeSummary');
+            const badge = document.getElementById('modeBadge');
+            if (!summary || !badge) return;
+
+            const mode = runtimeConfig.download_mode === 'video' ? 'video' : 'audio';
+            const format = mode === 'video'
+                ? (runtimeConfig.video_format || 'mp4').toUpperCase()
+                : (runtimeConfig.audio_format || 'mp3').toUpperCase();
+            const quality = mode === 'video'
+                ? `${runtimeConfig.video_quality || '1080'}p`
+                : `${runtimeConfig.audio_quality || '320'} kbps`;
+
+            const title = mode === 'video'
+                ? `Modo actual: Video ${format} ${quality}`
+                : `Modo actual: Audio ${format} ${quality}`;
+            const desc = mode === 'video'
+                ? 'Pensado para descargar clips, directos o videos listos para ver.'
+                : 'Ideal para playlists musicales y biblioteca organizada.';
+
+            summary.innerHTML = `<div><strong>${title}</strong><span>${desc}</span></div><div class="mode-summary-badge" id="modeBadge">${mode}</div>`;
+        }
+
+        function syncPresetCards(activePreset = '') {
+            document.querySelectorAll('.preset-card').forEach((card) => {
+                card.classList.toggle('active', card.dataset.preset === activePreset);
+            });
+        }
+
+        function syncModeControls() {
+            const formatSelect = document.getElementById('formatSelect');
+            const qualitySelect = document.getElementById('qualitySelect');
+            const writeSubtitles = document.getElementById('writeSubtitles');
+            const embedSubtitles = document.getElementById('embedSubtitles');
+            const isVideo = runtimeConfig.download_mode === 'video';
+
+            document.querySelectorAll('.mode-toggle').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.mode === runtimeConfig.download_mode);
+            });
+
+            if (formatSelect) {
+                formatSelect.innerHTML = isVideo
+                    ? '<option value="mp4">MP4</option><option value="mkv">MKV</option>'
+                    : '<option value="mp3">MP3</option><option value="m4a">M4A</option><option value="flac">FLAC</option><option value="opus">OPUS</option><option value="wav">WAV</option>';
+                formatSelect.value = isVideo ? (runtimeConfig.video_format || 'mp4') : (runtimeConfig.audio_format || 'mp3');
+            }
+
+            if (qualitySelect) {
+                qualitySelect.innerHTML = isVideo
+                    ? '<option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="360">360p</option>'
+                    : '<option value="320">320 kbps</option><option value="256">256 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option>';
+                qualitySelect.value = isVideo ? (runtimeConfig.video_quality || '1080') : (runtimeConfig.audio_quality || '320');
+            }
+
+            if (writeSubtitles) {
+                writeSubtitles.checked = !!runtimeConfig.write_subtitles;
+                writeSubtitles.disabled = !isVideo;
+            }
+            if (embedSubtitles) {
+                embedSubtitles.checked = !!runtimeConfig.embed_subtitles;
+                embedSubtitles.disabled = !isVideo;
+            }
+
+            updateModeSummary();
+        }
+
+        function syncPlaylistFolderControls() {
+            const modeSelect = document.getElementById('playlistFolderMode');
+            const templateInput = document.getElementById('playlistFolderTemplate');
+            if (modeSelect) {
+                modeSelect.value = runtimeConfig.playlist_folder_mode || 'inherit';
+            }
+            if (templateInput) {
+                templateInput.value = runtimeConfig.playlist_folder_template || '';
+                templateInput.disabled = (runtimeConfig.playlist_folder_mode || 'inherit') !== 'custom';
+            }
+        }
+
+        function setDownloadMode(mode, persist = true) {
+            runtimeConfig.download_mode = mode === 'video' ? 'video' : 'audio';
+            syncModeControls();
+            if (persist) {
+                persistConfigPatch({
+                    download_mode: runtimeConfig.download_mode,
+                    video_format: runtimeConfig.video_format,
+                    video_quality: runtimeConfig.video_quality,
+                    audio_format: runtimeConfig.audio_format,
+                    audio_quality: runtimeConfig.audio_quality
+                });
+            }
+        }
+
+        function setQuickTab(type) {
+            quickTab = type || 'auto';
+            document.querySelectorAll('.quick-tab').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.quickType === quickTab);
+            });
+
+            const urlInput = document.getElementById('urlInput');
+            if (!urlInput) return;
+
+            if (quickTab === 'playlist') {
+                urlInput.placeholder = 'Ej: https://music.youtube.com/playlist?list=...';
+            } else if (quickTab === 'channel') {
+                urlInput.placeholder = 'Ej: https://music.youtube.com/channel/... o /browse/...';
+            } else if (quickTab === 'video') {
+                urlInput.placeholder = 'Ej: https://www.youtube.com/watch?v=...';
+            } else {
+                urlInput.placeholder = 'Pega cualquier URL de YouTube o YouTube Music y la app intentara detectarla sola';
+            }
+        }
+
+        function renderDetectedPreview(data) {
+            const box = document.getElementById('detectedPreview');
+            if (!box) return;
+            if (!data) {
+                box.classList.add('hidden');
+                box.innerHTML = '';
+                return;
+            }
+
+            const pills = [];
+            if (data.uploader) pills.push(`<span class="detect-meta-pill">${escapeHtml(data.uploader)}</span>`);
+            if (data.artist) pills.push(`<span class="detect-meta-pill">${escapeHtml(data.artist)}</span>`);
+            if (data.total_videos) pills.push(`<span class="detect-meta-pill">${data.total_videos} items</span>`);
+            if (data.collections) pills.push(`<span class="detect-meta-pill">${data.collections} colecciones</span>`);
+            if (data.songs) pills.push(`<span class="detect-meta-pill">${data.songs} canciones</span>`);
+
+            box.classList.remove('hidden');
+            box.innerHTML = `
+                <div class="detect-preview-card">
+                    ${renderLargeThumb(data.thumbnail || '', data.type ? data.type.toUpperCase() : 'PREVIEW')}
+                    <div class="detect-preview-copy">
+                        <strong>${escapeHtml(data.title || 'Contenido detectado')}</strong>
+                        <p>${escapeHtml(data.description || 'Analisis completado. Puedes revisar miniaturas, filtrar resultados y decidir si lo envias a descarga inmediata o a la cola multiple.')}</p>
+                        <div class="detect-preview-meta">${pills.join('')}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleFormatChange() {
+            const value = document.getElementById('formatSelect').value;
+            if (runtimeConfig.download_mode === 'video') {
+                runtimeConfig.video_format = value;
+            } else {
+                runtimeConfig.audio_format = value;
+            }
+            syncPresetCards('');
+            syncModeControls();
+            persistConfigPatch({
+                audio_format: runtimeConfig.audio_format,
+                video_format: runtimeConfig.video_format
+            });
+        }
+
+        function handleQualityChange() {
+            const value = document.getElementById('qualitySelect').value;
+            if (runtimeConfig.download_mode === 'video') {
+                runtimeConfig.video_quality = value;
+            } else {
+                runtimeConfig.audio_quality = value;
+            }
+            syncPresetCards('');
+            updateModeSummary();
+            persistConfigPatch({
+                audio_quality: runtimeConfig.audio_quality,
+                video_quality: runtimeConfig.video_quality
+            });
+        }
+
+        function applyPreset(preset) {
+            if (preset === 'm4a') {
+                runtimeConfig.download_mode = 'audio';
+                runtimeConfig.audio_format = 'm4a';
+                runtimeConfig.audio_quality = '256';
+                runtimeConfig.write_subtitles = false;
+                runtimeConfig.embed_subtitles = false;
+            } else if (preset === 'mp4-720') {
+                runtimeConfig.download_mode = 'video';
+                runtimeConfig.video_format = 'mp4';
+                runtimeConfig.video_quality = '720';
+                runtimeConfig.write_subtitles = false;
+                runtimeConfig.embed_subtitles = false;
+            } else if (preset === 'mp4-1080') {
+                runtimeConfig.download_mode = 'video';
+                runtimeConfig.video_format = 'mp4';
+                runtimeConfig.video_quality = '1080';
+                runtimeConfig.write_subtitles = true;
+                runtimeConfig.embed_subtitles = false;
+            } else {
+                runtimeConfig.download_mode = 'audio';
+                runtimeConfig.audio_format = 'mp3';
+                runtimeConfig.audio_quality = '320';
+                runtimeConfig.write_subtitles = false;
+                runtimeConfig.embed_subtitles = false;
+                preset = 'mp3';
+            }
+
+            syncPresetCards(preset);
+            syncModeControls();
+            persistConfigPatch({
+                download_mode: runtimeConfig.download_mode,
+                audio_format: runtimeConfig.audio_format,
+                audio_quality: runtimeConfig.audio_quality,
+                video_format: runtimeConfig.video_format,
+                video_quality: runtimeConfig.video_quality,
+                write_subtitles: runtimeConfig.write_subtitles,
+                embed_subtitles: runtimeConfig.embed_subtitles
+            });
+            addLog(`[OK] Preset aplicado: ${preset}`);
+        }
+
+        function handlePlaylistFolderModeChange() {
+            const value = document.getElementById('playlistFolderMode')?.value || 'inherit';
+            runtimeConfig.playlist_folder_mode = value;
+            syncPlaylistFolderControls();
+            persistConfigPatch({ playlist_folder_mode: runtimeConfig.playlist_folder_mode });
+        }
+
+        function handlePlaylistFolderTemplateChange() {
+            const value = document.getElementById('playlistFolderTemplate')?.value || '';
+            runtimeConfig.playlist_folder_template = value;
+            persistConfigPatch({ playlist_folder_template: runtimeConfig.playlist_folder_template });
+        }
+
+        function markUrlState(state) {
+            const input = document.getElementById('urlInput');
+            const panel = document.querySelector('.url-panel');
+            if (!input || !panel) return;
+            input.classList.remove('url-valid', 'url-invalid');
+            panel.classList.remove('url-valid', 'url-invalid');
+            if (state === 'valid') {
+                input.classList.add('url-valid');
+                panel.classList.add('url-valid');
+            } else if (state === 'invalid') {
+                input.classList.add('url-invalid');
+                panel.classList.add('url-invalid');
+            }
+        }
+
+        async function persistConfigPatch(patch) {
+            try {
+                if (!cachedConfig) {
+                    const res = await fetch('/api/config');
+                    cachedConfig = await res.json();
+                }
+                cachedConfig = { ...cachedConfig, ...patch };
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cachedConfig)
+                });
+            } catch (e) {
+                console.error('Error guardando preferencias:', e);
+            }
+        }
+
+        function normalizeText(value) {
+            return (value || '')
+                .toString()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+        }
+
+        function setVideoListHeight(px, persist = true) {
+            listHeightPx = Math.max(360, Math.min(900, Number(px) || 560));
+            const list = document.getElementById('videoList');
+            const range = document.getElementById('listHeightRange');
+            const label = document.getElementById('listHeightLabel');
+            if (list) list.style.setProperty('--video-list-height', `${listHeightPx}px`);
+            if (range) range.value = String(listHeightPx);
+            if (label) label.textContent = `${listHeightPx}px`;
+            if (persist) persistConfigPatch({ ui_list_height: listHeightPx });
+        }
+
+        function isYouTubeUrl(text) {
+            return /(?:youtube\.com|youtu\.be|music\.youtube\.com)/i.test(text || '');
+        }
+
+        function predictUrlKind(url) {
+            const value = (url || '').trim().toLowerCase();
+            if (!value) return { state: 'empty', label: 'Esperando enlace...' };
+            if (!isYouTubeUrl(value)) return { state: 'invalid', label: 'No parece un enlace de YouTube' };
+
+            if (value.includes('music.youtube.com')) {
+                if (value.includes('/playlist') || value.includes('list=')) return { state: 'valid', kind: 'PLAYLIST', label: 'URL de playlist/album (YouTube Music)' };
+                if (value.includes('/channel/') || value.includes('/artist/') || value.includes('/browse/')) return { state: 'valid', kind: 'ARTISTA', label: 'URL de artista/canal (YouTube Music)' };
+                if (value.includes('/watch') || value.includes('/shorts/') || value.includes('/live/') || value.includes('/embed/') || value.includes('v=')) return { state: 'valid', kind: 'VIDEO', label: 'URL de cancion/video (YouTube Music)' };
+                return { state: 'valid', kind: 'YTM', label: 'URL valida de YouTube Music' };
+            }
+
+            if (value.includes('/playlist') || value.includes('list=')) return { state: 'valid', kind: 'PLAYLIST', label: 'URL de playlist' };
+            if (value.includes('/channel/') || value.includes('/@') || value.includes('/c/') || value.includes('/user/')) return { state: 'valid', kind: 'CANAL', label: 'URL de canal/artista' };
+            if (value.includes('/watch') || value.includes('/shorts/') || value.includes('/live/') || value.includes('/embed/') || value.includes('/v/') || value.includes('v=') || value.includes('youtu.be/')) return { state: 'valid', kind: 'VIDEO', label: 'URL de video/cancion' };
+            return { state: 'valid', kind: 'YT', label: 'URL valida de YouTube' };
+        }
+
+        function updateUrlPreview(url) {
+            const info = predictUrlKind(url);
+            const box = document.getElementById('urlPreview');
+            if (!box) return;
+            box.classList.remove('kind-valid', 'kind-invalid');
+            if (info.state === 'valid') box.classList.add('kind-valid');
+            if (info.state === 'invalid') box.classList.add('kind-invalid');
+
+            if (info.kind) {
+                box.innerHTML = `<span class="url-preview-dot"></span><span class="url-kind-badge">${info.kind}</span><span>${info.label}</span>`;
+            } else {
+                box.innerHTML = `<span class="url-preview-dot"></span><span>${info.label}</span>`;
+            }
+        }
+
+        async function tryClipboardAutofill() {
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.readText) return;
+                const clipboardText = (await navigator.clipboard.readText()).trim();
+                const urlInput = document.getElementById('urlInput');
+                if (!urlInput.value && isYouTubeUrl(clipboardText)) {
+                    urlInput.value = clipboardText;
+                    updateUrlPreview(clipboardText);
+                    addLog('[AUTO] URL detectada desde portapapeles');
+                    detectURL();
+                }
+            } catch (_) {}
+        }
+
+        async function pasteUrlFromClipboard() {
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                    addLog('[ERROR] Tu navegador no permite leer portapapeles automaticamente');
+                    return;
+                }
+                const text = (await navigator.clipboard.readText()).trim();
+                if (!text) {
+                    addLog('[ERROR] El portapapeles esta vacio');
+                    return;
+                }
+                const urlInput = document.getElementById('urlInput');
+                urlInput.value = text;
+                updateUrlPreview(text);
+                if (isYouTubeUrl(text)) {
+                    markUrlState('valid');
+                    addLog('[OK] Enlace pegado desde portapapeles');
+                    detectURL();
+                } else {
+                    markUrlState('invalid');
+                    addLog('[ERROR] El texto pegado no parece una URL valida de YouTube');
+                }
+            } catch (e) {
+                addLog(`[ERROR] No se pudo pegar desde portapapeles: ${e.message}`);
+            }
+        }
+
+        function clearUrlInput() {
+            const urlInput = document.getElementById('urlInput');
+            urlInput.value = '';
+            currentUrlType = null;
+            currentVideos = [];
+            currentDetected = null;
+            markUrlState('');
+            updateUrlPreview('');
+            document.getElementById('urlInfo').classList.add('hidden');
+            document.getElementById('videoListSection').classList.add('hidden');
+            document.getElementById('manualSection').classList.add('hidden');
+            document.getElementById('playlistFolderSection').classList.add('hidden');
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('queueBtn').disabled = true;
+            renderDetectedPreview(null);
+            addLog('[OK] URL limpiada');
+        }
+
+        function groupKeyForItem(item) {
+            if (!item) return 'Sin grupo';
+            if (item.item_type === 'collection') return item.artist || 'Colecciones';
+            return item.album || item.artist || 'Sin album';
+        }
+
+        function getGroupedItems(videos) {
+            const groups = {};
+            videos.forEach((item, idx) => {
+                const key = groupKeyForItem(item);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push({ item, idx });
+            });
+            return groups;
+        }
+
+        function getVisibleEntries(videos) {
+            const all = videos.map((item, idx) => ({ item, idx }));
+            let out = all;
+            if (displayFilter === 'collection') {
+                out = out.filter(({ item }) => (item.item_type || 'song') === 'collection');
+            } else if (displayFilter === 'song') {
+                out = out.filter(({ item }) => (item.item_type || 'song') === 'song');
+            }
+            const term = normalizeText(currentSearchTerm);
+            if (!term) return out;
+            return out.filter(({ item }) => {
+                const haystack = normalizeText(`${item.title || ''} ${item.artist || ''} ${item.album || ''}`);
+                return haystack.includes(term);
+            });
+        }
+
+        function getSelectionMap() {
+            const map = {};
+            document.querySelectorAll('.video-check').forEach((chk) => {
+                map[chk.dataset.idx] = chk.checked;
+            });
+            return map;
+        }
+
+        function renderVideoList(videos, preserveSelection = true) {
+            const selectedMap = preserveSelection ? getSelectionMap() : {};
+            const container = document.getElementById('videoList');
+            const visibleEntries = getVisibleEntries(videos);
+            const itemHtml = (v, idx, groupName) => {
+                const itemType = v.item_type || 'song';
+                const badge = itemType === 'collection'
+                    ? '<span class="item-badge collection">ALBUM/COLLECTION</span>'
+                    : '<span class="item-badge">SONG</span>';
+                const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : true;
+                const groupKey = encodeURIComponent(groupName || 'Sin grupo');
+                return `
+                    <div class="video-item">
+                        <input type="checkbox" class="video-check" data-idx="${idx}" data-group="${groupKey}" ${checked ? 'checked' : ''}>
+                        ${renderThumb(v.thumbnail || '', v.title || 'Preview')}
+                        <div>
+                            <div class="video-title">${idx + 1}. ${v.title || 'Sin titulo'}</div>
+                            <div class="video-artist">${v.artist || 'Unknown'}</div>
+                        </div>
+                        <div>${badge}</div>
+                    </div>
+                `;
+            };
+
+            if (visibleEntries.length === 0) {
+                const tip = currentSearchTerm
+                    ? 'Prueba con otra palabra o limpia la busqueda.'
+                    : 'Cambia el filtro de visualizacion para ver mas resultados.';
+                container.innerHTML = `<div class="video-item"><div></div><div><div class="video-title">No hay items visibles con el filtro actual</div><div class="video-artist">${tip}</div></div><div></div></div>`;
+                updateSelectionCount();
+                return;
+            }
+
+            if (viewMode === 'grouped') {
+                const groups = {};
+                visibleEntries.forEach(({ item, idx }) => {
+                    const key = groupKeyForItem(item);
+                    if (!groups[key]) groups[key] = [];
+                    groups[key].push({ item, idx });
+                });
+                const groupNames = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'es'));
+                container.innerHTML = groupNames.map((name) => {
+                    const groupKey = encodeURIComponent(name);
+                    const rows = groups[name].map(({ item, idx }) => itemHtml(item, idx, name)).join('');
+                    return `
+                        <div class="group-header">
+                            <div class="group-left">
+                                <input type="checkbox" class="group-check" data-group="${groupKey}" checked>
+                                <span class="group-name">${name}</span>
+                            </div>
+                            <span class="group-count" data-group="${groupKey}">${groups[name].length}/${groups[name].length}</span>
+                        </div>
+                        ${rows}
+                    `;
+                }).join('');
+            } else if (viewMode === 'grid') {
+                container.innerHTML = `<div class="video-grid">${
+                    visibleEntries.map(({ item, idx }) => {
+                        const itemType = item.item_type || 'song';
+                        const badge = itemType === 'collection'
+                            ? '<span class="item-badge collection">ALBUM/COLLECTION</span>'
+                            : '<span class="item-badge">SONG</span>';
+                        const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : true;
+                        const groupName = groupKeyForItem(item);
+                        const groupKey = encodeURIComponent(groupName || 'Sin grupo');
+                        return `
+                            <div class="video-card">
+                                <input type="checkbox" class="video-check" data-idx="${idx}" data-group="${groupKey}" ${checked ? 'checked' : ''}>
+                                ${renderThumb(item.thumbnail || '', item.title || 'Preview')}
+                                <div>
+                                    <div class="video-title">${idx + 1}. ${item.title || 'Sin titulo'}</div>
+                                    <div class="video-artist">${item.artist || 'Unknown'}</div>
+                                    <div class="meta-row">
+                                        ${badge}
+                                        <span class="muted">${groupName}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')
+                }</div>`;
+            } else {
+                container.innerHTML = visibleEntries.map(({ item, idx }) => itemHtml(item, idx, groupKeyForItem(item))).join('');
+            }
+            syncGroupCheckboxes();
+            updateSelectionCount();
+            updateFilterButtons();
+            updateViewButtons();
+            updateDisplayFilterControl();
+        }
+
+        function setViewMode(mode, options = {}) {
+            const persist = options.persist !== false;
+            const log = options.log !== false;
+            if (!['list', 'grouped', 'grid'].includes(mode)) return;
+            viewMode = mode;
+            renderVideoList(currentVideos, true);
+            if (log) {
+                const label = mode === 'grouped' ? 'agrupada' : mode === 'grid' ? 'cuadricula' : 'lista';
+                addLog(`[OK] Vista: ${label}`);
+            }
+            if (persist) persistConfigPatch({ ui_render_mode: viewMode });
+        }
+
+        function getSelectedItems() {
+            const checks = document.querySelectorAll('.video-check');
+            const out = [];
+            checks.forEach((chk) => {
+                if (chk.checked) {
+                    const idx = Number(chk.dataset.idx);
+                    if (currentVideos[idx]) out.push(currentVideos[idx]);
+                }
+            });
+            return out;
+        }
+
+        function buildDownloadData() {
+            const detectedUrl = (currentDetected && currentDetected.normalized_url) ? currentDetected.normalized_url : '';
+            return {
+                url: detectedUrl || document.getElementById('urlInput').value.trim(),
+                artist: document.getElementById('artistInput').value || 'Unknown',
+                title: (currentDetected && currentDetected.title) ? currentDetected.title : 'Unknown',
+                album: document.getElementById('albumInput').value || 'Unknown',
+                genre: document.getElementById('genreInput')?.value || '',
+                composer: document.getElementById('composerInput')?.value || '',
+                year: Number(document.getElementById('yearInput')?.value || new Date().getFullYear()),
+                track: Number(document.getElementById('trackInput')?.value || 1),
+                track_total: Number(document.getElementById('trackTotalInput')?.value || 0),
+                disc: Number(document.getElementById('discInput')?.value || 0),
+                disc_total: Number(document.getElementById('discTotalInput')?.value || 0),
+                language: document.getElementById('languageInput')?.value || '',
+                publisher: document.getElementById('publisherInput')?.value || '',
+                isrc: document.getElementById('isrcInput')?.value || '',
+                catalog_number: document.getElementById('catalogNumberInput')?.value || '',
+                barcode: document.getElementById('barcodeInput')?.value || '',
+                release_type: document.getElementById('releaseTypeInput')?.value || '',
+                release_country: document.getElementById('releaseCountryInput')?.value || '',
+                release_status: document.getElementById('releaseStatusInput')?.value || '',
+                mood: document.getElementById('moodInput')?.value || '',
+                comment: document.getElementById('commentInput')?.value || '',
+                thumbnail: (currentDetected && currentDetected.thumbnail) ? currentDetected.thumbnail : '',
+                download_mode: runtimeConfig.download_mode,
+                audio_format: runtimeConfig.audio_format,
+                audio_quality: runtimeConfig.audio_quality,
+                video_format: runtimeConfig.video_format,
+                video_quality: runtimeConfig.video_quality,
+                folder_structure: runtimeConfig.folder_structure,
+                playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
+                playlist_folder_template: runtimeConfig.playlist_folder_template || '',
+                filename_format: runtimeConfig.filename_format,
+                duplicate_mode: runtimeConfig.duplicate_mode,
+                force_redownload: document.getElementById('forceRedownload').checked,
+                smart_organize: runtimeConfig.smart_organize !== false,
+                embed_lyrics: runtimeConfig.embed_lyrics !== false,
+                embed_extended_metadata: runtimeConfig.embed_extended_metadata !== false,
+                write_subtitles: document.getElementById('writeSubtitles').checked,
+                embed_subtitles: document.getElementById('embedSubtitles').checked,
+                download_covers: true,
+                auto_metadata: true,
+                videos: currentVideos,
+                selected_items: getSelectedItems()
+            };
+        }
+
+        function getBulkUrls() {
+            const raw = (document.getElementById('bulkUrlInput')?.value || '').split(/\r?\n/);
+            return raw.map((line) => line.trim()).filter(Boolean);
+        }
+
+        async function detectUrlPayload(url) {
+            const forceType = quickTab === 'auto' ? '' : quickTab;
+            const res = await fetch('/api/detect-url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, force_type: forceType })
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                throw new Error(data.error || `HTTP ${res.status}`);
+            }
+            return data;
+        }
+
+        function canonicalQueueUrl(rawUrl) {
+            const raw = (rawUrl || '').toString().trim();
+            if (!raw) return '';
+            try {
+                const parsed = new URL(raw);
+                const host = parsed.hostname.toLowerCase();
+                const pathname = parsed.pathname.replace(/\/+$/, '');
+                const params = new URLSearchParams(parsed.search);
+                const important = new URLSearchParams();
+                ['v', 'list'].forEach((key) => {
+                    if (params.get(key)) important.set(key, params.get(key));
+                });
+                const qs = important.toString();
+                return `${host}${pathname}${qs ? `?${qs}` : ''}`;
+            } catch (e) {
+                return raw.toLowerCase();
+            }
+        }
+
+        function buildQueueSignature(type, payload) {
+            return `${(type || 'single').toLowerCase()}|${canonicalQueueUrl(payload?.url || '')}`;
+        }
+
+        function isQueueActiveStatus(status) {
+            return ['pending', 'processing', 'paused', 'iniciando', 'analizando', 'descargando', 'pausado'].includes((status || '').toLowerCase());
+        }
+
+        function findLocalDuplicateJob(signature) {
+            return pendingDownloadQueue.find((job) => job.signature === signature && isQueueActiveStatus(job.localStatus));
+        }
+
+        function findRemoteDuplicateJob(signature) {
+            return (remoteQueueItems || []).find((item) => {
+                if (!isQueueActiveStatus(item.status)) return false;
+                const remoteSignature = `${(item.type || 'single').toLowerCase()}|${canonicalQueueUrl(item.source_url || '')}`;
+                return remoteSignature === signature;
+            });
+        }
+
+        function enqueueOrUpdateJob(job, contextLabel = 'cola') {
+            const existingLocal = findLocalDuplicateJob(job.signature);
+            if (existingLocal) {
+                if (existingLocal.localStatus === 'processing') {
+                    addLog(`[INFO] Ya existe una descarga activa de esa URL en ${contextLabel}. Se mantiene la tarea actual.`);
+                    return { action: 'already-processing', job: existingLocal };
+                }
+                existingLocal.payload = job.payload;
+                existingLocal.label = job.label;
+                existingLocal.type = job.type;
+                existingLocal.signature = job.signature;
+                existingLocal.updatedAt = Date.now();
+                addLog(`[INFO] URL duplicada detectada: se actualizo la tarea existente en ${contextLabel}.`);
+                return { action: 'updated', job: existingLocal };
+            }
+
+            const existingRemote = findRemoteDuplicateJob(job.signature);
+            if (existingRemote) {
+                addLog(`[INFO] Esa URL ya se esta procesando en backend (cola ${existingRemote.queue_id}). No se agrego duplicada.`);
+                return { action: 'remote-active', queueId: existingRemote.queue_id };
+            }
+
+            pendingDownloadQueue.push(job);
+            return { action: 'added', job };
+        }
+
+        function enqueueDetectedPayload(url, detected) {
+            queueUiSeq += 1;
+            const isSingle = detected.type === 'video';
+            const normalizedUrl = detected.normalized_url || url;
+            const payload = {
+                url: normalizedUrl,
+                artist: detected.uploader || detected.artist || 'Unknown',
+                title: detected.title || 'Unknown',
+                album: detected.album || detected.title || 'Unknown',
+                thumbnail: detected.thumbnail || '',
+                download_mode: runtimeConfig.download_mode,
+                audio_format: runtimeConfig.audio_format,
+                audio_quality: runtimeConfig.audio_quality,
+                video_format: runtimeConfig.video_format,
+                video_quality: runtimeConfig.video_quality,
+                folder_structure: runtimeConfig.folder_structure,
+                playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
+                playlist_folder_template: runtimeConfig.playlist_folder_template || '',
+                filename_format: runtimeConfig.filename_format,
+                duplicate_mode: runtimeConfig.duplicate_mode,
+                force_redownload: document.getElementById('forceRedownload').checked,
+                smart_organize: runtimeConfig.smart_organize !== false,
+                embed_lyrics: runtimeConfig.embed_lyrics !== false,
+                embed_extended_metadata: runtimeConfig.embed_extended_metadata !== false,
+                write_subtitles: document.getElementById('writeSubtitles').checked,
+                embed_subtitles: document.getElementById('embedSubtitles').checked,
+                download_covers: true,
+                auto_metadata: true,
+                videos: detected.videos || [],
+                selected_items: detected.videos || []
+            };
+
+            const job = {
+                uiId: `job_${Date.now()}_${queueUiSeq}`,
+                type: isSingle ? 'single' : 'playlist',
+                label: detected.title || payload.album || 'Descarga',
+                payload,
+                signature: buildQueueSignature(isSingle ? 'single' : 'playlist', payload),
+                localStatus: 'pending',
+                progress: 0
+            };
+            return enqueueOrUpdateJob(job, 'carga masiva');
+        }
+
+        async function detectFirstBulkUrl() {
+            const urls = getBulkUrls();
+            if (!urls.length) {
+                addLog('[ERROR] No hay URLs en la carga masiva');
+                return;
+            }
+            document.getElementById('urlInput').value = urls[0];
+            updateUrlPreview(urls[0]);
+            await detectURL();
+        }
+
+        async function enqueueBulkUrls() {
+            const urls = getBulkUrls();
+            if (!urls.length) {
+                addLog('[ERROR] No hay URLs para agregar a la cola');
+                return;
+            }
+
+            let added = 0;
+            let updated = 0;
+            let skipped = 0;
+            for (const url of urls) {
+                try {
+                    const detected = await detectUrlPayload(url);
+                    const result = enqueueDetectedPayload(url, detected);
+                    if (result.action === 'added') {
+                        added += 1;
+                        addLog(`[OK] Encolada URL masiva: ${detected.title || url}`);
+                    } else if (result.action === 'updated') {
+                        updated += 1;
+                    } else {
+                        skipped += 1;
+                    }
+                } catch (e) {
+                    addLog(`[ERROR] No se pudo encolar ${url}: ${e.message}`);
+                }
+            }
+            renderQueueList();
+            addLog(`[OK] Carga masiva: agregadas ${added}, actualizadas ${updated}, omitidas ${skipped}`);
+        }
+
+        function describeLocalQueueItem(job) {
+            const mode = job.payload.download_mode === 'video'
+                ? `${(job.payload.video_format || 'mp4').toUpperCase()} ${job.payload.video_quality || '1080'}p`
+                : `${(job.payload.audio_format || 'mp3').toUpperCase()} ${job.payload.audio_quality || '320'} kbps`;
+            const count = job.type === 'single' ? '1 item' : `${job.payload.selected_items.length} items`;
+            return `${mode} | ${count}`;
+        }
+
+        async function openFolderPath(path) {
+            try {
+                const res = await fetch('/api/open-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+            } catch (e) {
+                addLog(`[ERROR] No se pudo abrir la carpeta: ${e.message}`);
+            }
+        }
+
+        function openFolderPathFromEncoded(encodedPath) {
+            try {
+                const decoded = decodeURIComponent(encodedPath || '');
+                if (decoded) openFolderPath(decoded);
+            } catch (e) {
+                addLog(`[ERROR] Ruta invalida: ${e.message}`);
+            }
+        }
+
+        function moveQueuedJob(uiId, direction) {
+            const index = pendingDownloadQueue.findIndex((item) => item.uiId === uiId);
+            if (index < 0) return;
+            const targetIndex = direction === 'up' ? index - 1 : index + 1;
+            if (targetIndex < 0 || targetIndex >= pendingDownloadQueue.length) return;
+            const current = pendingDownloadQueue[index];
+            if (current.localStatus === 'processing') return;
+            const swap = pendingDownloadQueue[targetIndex];
+            if (swap.localStatus === 'processing') return;
+            pendingDownloadQueue[index] = swap;
+            pendingDownloadQueue[targetIndex] = current;
+            renderQueueList();
+        }
+
+        function renderQueueList() {
+            const box = document.getElementById('queueList');
+            const meta = document.getElementById('queueMeta');
+            if (!box || !meta) return;
+
+            const pendingCount = pendingDownloadQueue.filter((item) => ['pending', 'paused'].includes(item.localStatus)).length;
+            const failedCount = pendingDownloadQueue.filter((item) => ['error', 'cancelado'].includes(item.localStatus)).length;
+            const remoteActive = (remoteQueueItems || []).filter((item) => !['completado', 'error'].includes(item.status)).length;
+            meta.textContent = `${pendingCount} pendientes | ${failedCount} fallidas | ${remoteActive} activas en backend`;
+
+            if (!pendingDownloadQueue.length && !(remoteQueueItems || []).length) {
+                box.innerHTML = `<div class="queue-empty">Agrega tareas desde la deteccion actual. La cola se ejecuta en secuencia para que la app se comporte como un gestor de descargas.</div>`;
+                return;
+            }
+
+            const localHtml = pendingDownloadQueue.map((job) => {
+                const statusClass = formatStatusLabel(job.localStatus);
+                const isActive = activeQueueUiId === job.uiId;
+                const localBaseEncoded = encodeURIComponent(cachedConfig?.download_path || '');
+                const controls = job.localStatus === 'pending' || job.localStatus === 'paused'
+                    ? `<button class="btn btn-secondary" type="button" onclick="moveQueuedJob('${job.uiId}', 'up')">Subir</button>
+                       <button class="btn btn-secondary" type="button" onclick="moveQueuedJob('${job.uiId}', 'down')">Bajar</button>
+                       <button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${localBaseEncoded}')">Abrir carpeta</button>
+                       <button class="btn btn-secondary" type="button" onclick="removeQueuedJob('${job.uiId}')">Quitar</button>`
+                    : (['error', 'cancelado'].includes(job.localStatus)
+                        ? `<button class="btn btn-secondary" type="button" onclick="retryQueuedJob('${job.uiId}')">Reintentar</button>
+                           <button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${localBaseEncoded}')">Abrir carpeta</button>
+                           <button class="btn btn-secondary" type="button" onclick="removeQueuedJob('${job.uiId}')">Quitar</button>`
+                        : '');
+                return `
+                    <div class="queue-item-card ${isActive ? 'active' : ''}">
+                        <div class="queue-item-body">
+                            ${renderMiniThumb(job.payload.thumbnail || '', job.label || 'COLA', 'queue')}
+                            <div>
+                                <div class="queue-item-top">
+                                    <div>
+                                        <div class="queue-item-title">${escapeHtml(job.label)}</div>
+                                        <div class="queue-item-sub">${escapeHtml(describeLocalQueueItem(job))}</div>
+                                    </div>
+                                    <span class="status-chip ${escapeHtml(statusClass)}">${escapeHtml(statusClass)}</span>
+                                </div>
+                                <div class="meta-line">Origen: ${escapeHtml(job.payload.url || '')}</div>
+                                <div class="meta-line">Destino base: ${escapeHtml(cachedConfig?.download_path || '')}</div>
+                                ${job.speed || job.eta ? `<div class="meta-line">Velocidad: ${escapeHtml(job.speed || '--')} | ETA: ${escapeHtml(job.eta || '--')}</div>` : ''}
+                                <div class="mini-progress"><span style="width:${Number(job.progress || 0)}%"></span></div>
+                                <div class="queue-actions">
+                                    ${controls}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const localQueueIds = new Set(
+                pendingDownloadQueue
+                    .map((job) => Number(job.queueId || 0))
+                    .filter((id) => Number.isFinite(id) && id > 0)
+            );
+            const visibleRemoteItems = (remoteQueueItems || [])
+                .filter((item) => !localQueueIds.has(Number(item.queue_id || 0)))
+                .slice(0, 8);
+
+            const remoteHtml = visibleRemoteItems.map((item) => {
+                const statusClass = formatStatusLabel(item.status);
+                const remoteDestEncoded = encodeURIComponent(item.destination || '');
+                const controls = item.status === 'pausado'
+                    ? `<button class="btn btn-secondary" type="button" onclick="controlRemoteQueue(${item.queue_id}, 'resume')">Reanudar</button>
+                       <button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${remoteDestEncoded}')">Abrir carpeta</button>
+                       <button class="btn btn-secondary" type="button" onclick="controlRemoteQueue(${item.queue_id}, 'cancel')">Cancelar</button>`
+                    : (!['completado', 'error', 'cancelado'].includes(item.status)
+                        ? `<button class="btn btn-secondary" type="button" onclick="controlRemoteQueue(${item.queue_id}, 'pause')">Pausar</button>
+                           <button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${remoteDestEncoded}')">Abrir carpeta</button>
+                           <button class="btn btn-secondary" type="button" onclick="controlRemoteQueue(${item.queue_id}, 'cancel')">Cancelar</button>`
+                        : `<button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${remoteDestEncoded}')">Abrir carpeta</button>`);
+                return `
+                    <div class="queue-item-card">
+                        <div class="queue-item-body">
+                            ${renderMiniThumb(item.thumbnail || '', item.title || 'BACKEND', 'queue')}
+                            <div>
+                                <div class="queue-item-top">
+                                    <div>
+                                        <div class="queue-item-title">${escapeHtml(item.title || item.artist || `Tarea ${item.queue_id || ''}`)}</div>
+                                        <div class="queue-item-sub">${escapeHtml((item.type || 'download') + ' | backend')}</div>
+                                    </div>
+                                    <span class="status-chip ${escapeHtml(statusClass)}">${escapeHtml(statusClass)}</span>
+                                </div>
+                                <div class="meta-line">Destino: ${escapeHtml(item.destination || '')}</div>
+                                ${item.speed || item.eta ? `<div class="meta-line">Velocidad: ${escapeHtml(item.speed || '--')} | ETA: ${escapeHtml(item.eta || '--')}</div>` : ''}
+                                <div class="mini-progress"><span style="width:${Number(item.progress || 0)}%"></span></div>
+                                <div class="queue-actions">${controls}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            box.innerHTML = [localHtml, remoteHtml].filter(Boolean).join('');
+        }
+
+        function renderHistoryList() {
+            const box = document.getElementById('historyList');
+            if (!box) return;
+            if (!historyItems.length) {
+                box.innerHTML = `<div class="history-empty">Todavia no hay historial guardado. Cuando finalicen descargas, aqui veras estado, carpeta destino y resumen de cada tarea.</div>`;
+                return;
+            }
+
+            box.innerHTML = historyItems.map((item) => {
+                const statusClass = formatStatusLabel(item.status);
+                const subtitle = item.artist ? `${item.artist} | ${item.mode || 'audio'}` : `${item.mode || 'audio'}`;
+                const historyDestEncoded = encodeURIComponent(item.destination || '');
+                const controls = ['error', 'cancelado'].includes(item.status)
+                    ? `<button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${historyDestEncoded}')">Abrir carpeta</button>
+                       <button class="btn btn-secondary" type="button" onclick="validateHistoryItem('${item.history_id}')">Validar archivos</button>
+                       <button class="btn btn-secondary" type="button" onclick="retryHistoryItem('${item.history_id}')">Reintentar</button>`
+                    : `<button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${historyDestEncoded}')">Abrir carpeta</button>
+                       <button class="btn btn-secondary" type="button" onclick="validateHistoryItem('${item.history_id}')">Validar archivos</button>`;
+                return `
+                    <div class="history-card">
+                        <div class="history-body">
+                            ${renderMiniThumb(item.thumbnail || '', item.title || 'HIST', 'history')}
+                            <div>
+                                <div class="history-top">
+                                    <div>
+                                        <div class="history-title">${escapeHtml(item.title || 'Sin titulo')}</div>
+                                        <div class="history-sub">${escapeHtml(subtitle)}</div>
+                                    </div>
+                                    <span class="status-chip ${escapeHtml(statusClass)}">${escapeHtml(statusClass)}</span>
+                                </div>
+                                <div class="meta-line">Carpeta destino: ${escapeHtml(item.destination || 'Sin definir')}</div>
+                                <div class="meta-line">Actualizado: ${escapeHtml(item.updated_at || item.created_at || '')}</div>
+                                ${item.speed || item.eta ? `<div class="meta-line">Velocidad: ${escapeHtml(item.speed || '--')} | ETA: ${escapeHtml(item.eta || '--')}</div>` : ''}
+                                ${item.progress ? `<div class="mini-progress"><span style="width:${Number(item.progress || 0)}%"></span></div>` : ''}
+                                <div class="queue-actions">${controls}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function refreshQueuePanels() {
+            try {
+                const [queueRes, historyRes] = await Promise.all([
+                    fetch('/api/queue'),
+                    fetch('/api/history')
+                ]);
+                remoteQueueItems = queueRes.ok ? await queueRes.json() : [];
+                historyItems = historyRes.ok ? await historyRes.json() : [];
+            } catch (e) {
+                console.error('Error refrescando paneles:', e);
+            }
+            renderQueueList();
+            renderHistoryList();
+        }
+
+        async function controlRemoteQueue(queueId, action) {
+            try {
+                const res = await fetch(`/api/queue/${queueId}/control`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                addLog(`[OK] Cola ${queueId}: ${action}`);
+                await refreshQueuePanels();
+            } catch (e) {
+                addLog(`[ERROR] No se pudo aplicar ${action}: ${e.message}`);
+            }
+        }
+
+        async function retryHistoryItem(historyId) {
+            if (!historyId) return;
+            if (retryInFlight.has(historyId)) {
+                addLog('[INFO] Ese reintento ya se esta procesando...');
+                return;
+            }
+            retryInFlight.add(historyId);
+            try {
+                const forceRedownload = document.getElementById('forceRedownload')?.checked === true;
+                const res = await fetch(`/api/history/${historyId}/retry`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ force_redownload: forceRedownload })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                if (data.duplicate) {
+                    addLog(`[INFO] ${data.message || 'Ya habia una tarea activa; se reutilizo la cola.'} (ID cola: ${data.queue_id})`);
+                } else {
+                    addLog(`[OK] Reintento lanzado desde historial (ID cola: ${data.queue_id})`);
+                }
+                await refreshQueuePanels();
+            } catch (e) {
+                addLog(`[ERROR] No se pudo reintentar: ${e.message}`);
+            } finally {
+                retryInFlight.delete(historyId);
+            }
+        }
+
+        async function validateHistoryItem(historyId) {
+            try {
+                const res = await fetch(`/api/history/${historyId}/validate`, { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                const base = `[VALIDAR] ${data.kind || 'item'} | archivos detectados: ${data.media_files_found}/${data.expected_items}`;
+                if (data.looks_complete) {
+                    addLog(`${base} | OK`);
+                } else {
+                    addLog(`${base} | Faltantes: ${data.missing_items}. ${data.suggestion || ''}`);
+                }
+            } catch (e) {
+                addLog(`[ERROR] No se pudo validar historial: ${e.message}`);
+            }
+        }
+
+        function removeQueuedJob(uiId) {
+            const job = pendingDownloadQueue.find((item) => item.uiId === uiId);
+            if (job && job.localStatus === 'processing') {
+                addLog('[ERROR] No puedes quitar una tarea que ya esta en ejecucion');
+                return;
+            }
+            pendingDownloadQueue = pendingDownloadQueue.filter((item) => item.uiId !== uiId);
+            renderQueueList();
+        }
+
+        function clearPendingQueue() {
+            pendingDownloadQueue = pendingDownloadQueue.filter((item) => item.localStatus === 'processing');
+            renderQueueList();
+            addLog('[OK] Se limpiaron las tareas pendientes de la cola');
+        }
+
+        function retryQueuedJob(uiId) {
+            const job = pendingDownloadQueue.find((item) => item.uiId === uiId);
+            if (!job) return;
+            if (job.localStatus === 'processing') {
+                addLog('[INFO] Esa tarea ya esta en ejecucion.');
+                return;
+            }
+            job.localStatus = 'pending';
+            job.progress = 0;
+            job.speed = '';
+            job.eta = '';
+            addLog(`[OK] Tarea marcada para reintento: ${job.label || 'Descarga'}`);
+            renderQueueList();
+        }
+
+        function retryFailedQueueJobs() {
+            const failed = pendingDownloadQueue.filter((item) => ['error', 'cancelado'].includes(item.localStatus));
+            if (!failed.length) {
+                addLog('[INFO] No hay tareas fallidas para reintentar.');
+                return;
+            }
+            failed.forEach((job) => {
+                job.localStatus = 'pending';
+                job.progress = 0;
+                job.speed = '';
+                job.eta = '';
+            });
+            renderQueueList();
+            addLog(`[OK] ${failed.length} tarea(s) fallida(s) marcadas para reintento.`);
+        }
+
+        function enqueueCurrentDownload() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url || !currentUrlType) {
+                addLog('[ERROR] Detecta una URL antes de agregar a la cola');
+                return;
+            }
+
+            const payload = buildDownloadData();
+            if (['playlist', 'channel', 'artist'].includes(currentUrlType) && payload.selected_items.length === 0) {
+                addLog('[ERROR] Selecciona al menos un item para agregar a la cola');
+                return;
+            }
+
+            queueUiSeq += 1;
+            const job = {
+                uiId: `job_${Date.now()}_${queueUiSeq}`,
+                type: currentUrlType === 'video' ? 'single' : 'playlist',
+                label: currentDetected?.title || payload.album || 'Descarga',
+                payload,
+                signature: buildQueueSignature(currentUrlType === 'video' ? 'single' : 'playlist', payload),
+                localStatus: 'pending',
+                progress: 0
+            };
+            const result = enqueueOrUpdateJob(job, 'la cola');
+            renderQueueList();
+            if (result.action === 'added') {
+                addLog(`[OK] Tarea agregada a la cola: ${job.label}`);
+            }
+        }
+
+        async function launchDownloadRequest(downloadData, endpoint) {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(downloadData)
+            });
+            return res.json();
+        }
+
+        async function processQueuedJob(job) {
+            const endpoint = job.type === 'single' ? '/api/download-single' : '/api/download-playlist';
+            const data = await launchDownloadRequest(job.payload, endpoint);
+            if (!data.queue_id) {
+                throw new Error(data.error || 'No se pudo iniciar la descarga en cola');
+            }
+            if (data.duplicate) {
+                addLog(`[INFO] ${data.message || 'Se detecto descarga duplicada activa; se reutiliza la cola existente.'}`);
+            }
+            currentQueueId = data.queue_id;
+            activeQueueUiId = job.uiId;
+            job.queueId = data.queue_id;
+            job.localStatus = 'processing';
+            renderQueueList();
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('downloadBtn').disabled = true;
+            monitorDownload(job);
+        }
+
+        async function startQueuedDownloads() {
+            if (activeQueueUiId || statusCheckInterval) {
+                addLog('[INFO] Ya hay una tarea en ejecucion');
+                return;
+            }
+            const nextJob = pendingDownloadQueue.find((item) => item.localStatus === 'pending');
+            if (!nextJob) {
+                addLog('[INFO] No hay tareas pendientes en la cola');
+                return;
+            }
+            await processQueuedJob(nextJob);
+        }
+
+        function updateSelectionCount() {
+            const selectedTotal = getSelectedItems().length;
+            const visibleChecks = Array.from(document.querySelectorAll('.video-check'));
+            const visibleSelected = visibleChecks.filter((c) => c.checked).length;
+            document.getElementById('videoCount').textContent = `${selectedTotal} seleccionados totales de ${currentVideos.length} | visibles ${visibleSelected}/${visibleChecks.length}`;
+        }
+
+        function selectAllItems(value) {
+            document.querySelectorAll('.video-check').forEach(c => c.checked = value);
+            syncGroupCheckboxes();
+            updateSelectionCount();
+        }
+
+        function selectByType(type) {
+            document.querySelectorAll('.video-check').forEach(c => {
+                const idx = Number(c.dataset.idx);
+                const item = currentVideos[idx];
+                c.checked = item && (item.item_type || 'song') === type;
+            });
+            syncGroupCheckboxes();
+            updateSelectionCount();
+        }
+
+        function updateFilterButtons() {
+            document.querySelectorAll('.btn-filter').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.filter === currentSelectionFilter);
+            });
+        }
+
+        function updateViewButtons() {
+            document.querySelectorAll('.chip-btn[data-view]').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.view === viewMode);
+            });
+        }
+
+        function updateDisplayFilterControl() {
+            const sel = document.getElementById('displayFilter');
+            if (sel) sel.value = displayFilter;
+        }
+
+        function setDisplayFilter(filter, options = {}) {
+            const persist = options.persist !== false;
+            const log = options.log !== false;
+            if (!['all', 'song', 'collection'].includes(filter)) return;
+            displayFilter = filter;
+            renderVideoList(currentVideos, true);
+            if (persist) persistConfigPatch({ ui_display_filter: displayFilter });
+            if (log) {
+                const label = filter === 'song' ? 'solo canciones' : filter === 'collection' ? 'solo albumes/colecciones' : 'todo';
+                addLog(`[OK] Filtro visual: ${label}`);
+            }
+        }
+
+        function applySelectionFilter(filter, options = {}) {
+            const persist = options.persist !== false;
+            const log = options.log !== false;
+            currentSelectionFilter = filter;
+
+            if (filter === 'song') {
+                selectByType('song');
+            } else if (filter === 'collection') {
+                selectByType('collection');
+            } else {
+                selectAllItems(true);
+            }
+
+            updateFilterButtons();
+            if (persist) {
+                persistConfigPatch({ ui_selection_filter: currentSelectionFilter });
+            }
+            if (log) {
+                const label = filter === 'song' ? 'solo canciones' : filter === 'collection' ? 'solo albums/colecciones' : 'todo';
+                addLog(`[OK] Filtro aplicado: ${label}`);
+            }
+        }
+
+        function selectCompleteAlbums() {
+            document.querySelectorAll('.video-check').forEach((c) => {
+                const idx = Number(c.dataset.idx);
+                const item = currentVideos[idx];
+                c.checked = item && (item.item_type || 'song') === 'collection';
+            });
+            currentSelectionFilter = 'collection';
+            syncGroupCheckboxes();
+            updateSelectionCount();
+            updateFilterButtons();
+            persistConfigPatch({ ui_selection_filter: currentSelectionFilter });
+            addLog('[OK] Seleccion aplicada: albums completos');
+        }
+
+        function toggleGroupItems(groupKey, checked) {
+            document.querySelectorAll(`.video-check[data-group="${groupKey}"]`).forEach((chk) => {
+                chk.checked = checked;
+            });
+        }
+
+        function syncGroupCheckboxes() {
+            document.querySelectorAll('.group-check').forEach((groupChk) => {
+                const groupKey = groupChk.dataset.group;
+                const children = Array.from(document.querySelectorAll(`.video-check[data-group="${groupKey}"]`));
+                const groupCount = document.querySelector(`.group-count[data-group="${groupKey}"]`);
+                if (!children.length) {
+                    groupChk.indeterminate = false;
+                    groupChk.checked = false;
+                    if (groupCount) groupCount.textContent = '0/0';
+                    return;
+                }
+                const selected = children.filter((c) => c.checked).length;
+                groupChk.checked = selected === children.length;
+                groupChk.indeterminate = selected > 0 && selected < children.length;
+                if (groupCount) groupCount.textContent = `${selected}/${children.length}`;
+            });
+        }
+
+        document.addEventListener('change', (evt) => {
+            if (evt.target && evt.target.classList.contains('group-check')) {
+                toggleGroupItems(evt.target.dataset.group, evt.target.checked);
+                syncGroupCheckboxes();
+                updateSelectionCount();
+            }
+            if (evt.target && evt.target.classList.contains('video-check')) {
+                syncGroupCheckboxes();
+                updateSelectionCount();
+            }
+        });
+
+        async function detectURL() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) {
+                addLog('[ERROR] Ingresa una URL');
+                return;
+            }
+
+            const btn = document.getElementById('detectBtn');
+            btn.disabled = true;
+            btn.textContent = 'Detectando...';
+            addLog('[DETECTAR] Analizando URL...');
+            markUrlState(isYouTubeUrl(url) ? 'valid' : 'invalid');
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+                const res = await fetch('/api/detect-url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, force_type: quickTab === 'auto' ? '' : quickTab }),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                const data = await res.json();
+                btn.disabled = false;
+                btn.textContent = 'Detectar';
+
+                if (data.error) {
+                    markUrlState('invalid');
+                    renderDetectedPreview(null);
+                    document.getElementById('queueBtn').disabled = true;
+                    addLog(`[ERROR] ${data.error}`);
+                    return;
+                }
+                markUrlState('valid');
+
+                currentUrlType = data.type;
+                currentVideos = data.videos || [];
+                currentDetected = data;
+
+                const urlInfo = document.getElementById('urlInfo');
+                const badge = document.getElementById('urlBadge');
+                const typeInfo = document.getElementById('typeInfo');
+                const queueBtn = document.getElementById('queueBtn');
+
+                if (['playlist', 'channel', 'artist'].includes(data.type)) {
+                    badge.className = 'badge ' + (data.type === 'artist' ? 'badge-artist' : 'badge-playlist');
+                    badge.textContent = data.type.toUpperCase();
+
+                    if (data.type === 'artist') {
+                        typeInfo.innerHTML = `<strong>${data.title}</strong><br>Artista: ${data.uploader || 'Unknown'}<br>Total items: ${data.total_videos}<br>Colecciones: ${data.collections || 0}<br>Canciones: ${data.songs || 0}`;
+                    } else {
+                        typeInfo.innerHTML = `<strong>${data.title}</strong><br>Artista: ${data.uploader || 'Unknown'}<br>Videos: ${data.total_videos}`;
+                    }
+
+                    renderVideoList(currentVideos, false);
+                    applySelectionFilter(currentSelectionFilter, { persist: false, log: false });
+                    document.getElementById('videoListSection').classList.remove('hidden');
+                    document.getElementById('manualSection').classList.add('hidden');
+                    document.getElementById('playlistFolderSection').classList.remove('hidden');
+
+                    document.getElementById('artistInput').value = data.uploader || data.title || '';
+                    document.getElementById('albumInput').value = data.title || '';
+
+                    addLog(`[OK] Detectado ${data.type}: ${currentVideos.length} items listos`);
+                } else {
+                    badge.className = 'badge badge-video';
+                    badge.textContent = 'VIDEO';
+                    typeInfo.innerHTML = `<strong>${data.title}</strong><br>Artista: ${data.artist}`;
+
+                    document.getElementById('videoListSection').classList.add('hidden');
+                    document.getElementById('manualSection').classList.remove('hidden');
+                    document.getElementById('playlistFolderSection').classList.add('hidden');
+
+                    document.getElementById('artistInput').value = data.artist || '';
+                    document.getElementById('albumInput').value = data.album || '';
+
+                    addLog('[OK] Video detectado');
+                }
+
+                renderDetectedPreview(data);
+                urlInfo.classList.remove('hidden');
+                document.getElementById('downloadBtn').disabled = false;
+                if (queueBtn) queueBtn.disabled = false;
+
+            } catch (error) {
+                btn.disabled = false;
+                btn.textContent = 'Detectar';
+                markUrlState('invalid');
+                renderDetectedPreview(null);
+                document.getElementById('queueBtn').disabled = true;
+                if (error.name === 'AbortError') {
+                    addLog('[ERROR] Tiempo limite excedido (35s)');
+                } else {
+                    addLog(`[ERROR] ${error.message}`);
+                }
+            }
+        }
+
+        async function startDownload() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url || !currentUrlType) {
+                addLog('[ERROR] Detecta la URL primero');
+                return;
+            }
+
+            const selectedItems = getSelectedItems();
+            if (['playlist', 'channel', 'artist'].includes(currentUrlType) && selectedItems.length === 0) {
+                addLog('[ERROR] Selecciona al menos un item para descargar');
+                return;
+            }
+
+            const isSingle = currentUrlType === 'video';
+            const endpoint = isSingle ? '/api/download-single' : '/api/download-playlist';
+            const downloadData = buildDownloadData();
+
+            try {
+                const data = await launchDownloadRequest(downloadData, endpoint);
+
+                if (data.queue_id) {
+                    currentQueueId = data.queue_id;
+                    activeQueueUiId = null;
+                    document.getElementById('progressSection').style.display = 'block';
+                    document.getElementById('downloadBtn').disabled = true;
+                    if (data.duplicate) {
+                        addLog(`[INFO] ${data.message || 'Ya habia una descarga activa de esa URL. Se reutilizo.'} (ID: ${data.queue_id})`);
+                    } else {
+                        addLog(`[OK] Descarga iniciada (ID: ${data.queue_id})`);
+                    }
+                    monitorDownload(null);
+                } else {
+                    addLog(`[ERROR] ${data.error || 'No se pudo iniciar descarga'}`);
+                }
+            } catch (error) {
+                addLog(`[ERROR] ${error.message}`);
+            }
+        }
+
+        function monitorDownload(activeJob = null) {
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+            lastMonitoredStatus = '';
+
+            statusCheckInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${currentQueueId}`);
+                    const status = await res.json();
+
+                    if (!status.error) {
+                        const statusChanged = lastMonitoredStatus !== status.status;
+                        lastMonitoredStatus = status.status;
+                        document.getElementById('progressFill').style.width = status.progress + '%';
+                        let msg = `${status.progress}% - ${status.message}`;
+                        if (status.downloaded) msg += ` (${status.downloaded}/${status.total_videos})`;
+                        if (status.skipped) msg += ` | omitidos: ${status.skipped}`;
+                        if (status.replaced) msg += ` | reemplazados: ${status.replaced}`;
+                        document.getElementById('progressText').textContent = msg;
+
+                        if (status.status === 'completado') {
+                            addLog('[OK] Descarga completada');
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                            document.getElementById('downloadBtn').disabled = false;
+                            if (activeJob) {
+                                activeJob.localStatus = 'completado';
+                                activeJob.progress = 100;
+                                activeQueueUiId = null;
+                                renderQueueList();
+                                await refreshQueuePanels();
+                                await startQueuedDownloads();
+                            } else {
+                                await refreshQueuePanels();
+                            }
+                        } else if (status.status === 'error') {
+                            addLog(`[ERROR] ${status.message}`);
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                            document.getElementById('downloadBtn').disabled = false;
+                            if (activeJob) {
+                                activeJob.localStatus = 'error';
+                                activeJob.progress = status.progress || 0;
+                                activeQueueUiId = null;
+                                renderQueueList();
+                                await refreshQueuePanels();
+                                await startQueuedDownloads();
+                            } else {
+                                await refreshQueuePanels();
+                            }
+                        } else if (status.status === 'cancelado') {
+                            if (statusChanged) addLog('[INFO] Descarga cancelada');
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                            document.getElementById('downloadBtn').disabled = false;
+                            if (activeJob) {
+                                activeJob.localStatus = 'cancelado';
+                                activeJob.progress = status.progress || 0;
+                                activeQueueUiId = null;
+                                renderQueueList();
+                                await refreshQueuePanels();
+                                await startQueuedDownloads();
+                            } else {
+                                await refreshQueuePanels();
+                            }
+                        } else if (status.status === 'pausado') {
+                            if (statusChanged) addLog('[INFO] Descarga en pausa');
+                            if (activeJob) {
+                                activeJob.localStatus = 'paused';
+                                activeJob.progress = status.progress || 0;
+                                activeJob.speed = status.speed || '';
+                                activeJob.eta = status.eta || '';
+                                renderQueueList();
+                            }
+                        } else if (activeJob) {
+                            activeJob.progress = status.progress || 0;
+                            activeJob.localStatus = 'processing';
+                            activeJob.speed = status.speed || '';
+                            activeJob.eta = status.eta || '';
+                            renderQueueList();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error monitoreando:', error);
+                }
+            }, 1000);
+        }
+
+        window.addEventListener('load', async () => {
+            const urlInput = document.getElementById('urlInput');
+            const searchInput = document.getElementById('itemSearch');
+            const listHeightRange = document.getElementById('listHeightRange');
+            const writeSubtitles = document.getElementById('writeSubtitles');
+            const embedSubtitles = document.getElementById('embedSubtitles');
+            const playlistFolderMode = document.getElementById('playlistFolderMode');
+            const playlistFolderTemplate = document.getElementById('playlistFolderTemplate');
+            updateUrlPreview(urlInput.value || '');
+            urlInput.addEventListener('paste', () => {
+                setTimeout(() => {
+                    const value = urlInput.value.trim();
+                    updateUrlPreview(value);
+                    if (isYouTubeUrl(value)) detectURL();
+                }, 120);
+            });
+
+            urlInput.addEventListener('change', () => {
+                const value = urlInput.value.trim();
+                updateUrlPreview(value);
+                markUrlState(value ? (isYouTubeUrl(value) ? 'valid' : 'invalid') : '');
+                if (isYouTubeUrl(value)) detectURL();
+            });
+            urlInput.addEventListener('input', () => {
+                const value = urlInput.value.trim();
+                updateUrlPreview(value);
+                markUrlState(value ? (isYouTubeUrl(value) ? 'valid' : 'invalid') : '');
+            });
+            urlInput.addEventListener('keydown', (evt) => {
+                if (evt.key === 'Enter') {
+                    evt.preventDefault();
+                    detectURL();
+                }
+            });
+
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    currentSearchTerm = searchInput.value || '';
+                    renderVideoList(currentVideos, true);
+                });
+                searchInput.addEventListener('change', () => {
+                    persistConfigPatch({ ui_item_search: currentSearchTerm });
+                });
+            }
+            if (listHeightRange) {
+                listHeightRange.addEventListener('input', () => {
+                    setVideoListHeight(listHeightRange.value, false);
+                });
+                listHeightRange.addEventListener('change', () => {
+                    setVideoListHeight(listHeightRange.value, true);
+                });
+            }
+            if (writeSubtitles) {
+                writeSubtitles.addEventListener('change', () => {
+                    runtimeConfig.write_subtitles = writeSubtitles.checked;
+                    persistConfigPatch({ write_subtitles: runtimeConfig.write_subtitles });
+                });
+            }
+            if (embedSubtitles) {
+                embedSubtitles.addEventListener('change', () => {
+                    runtimeConfig.embed_subtitles = embedSubtitles.checked;
+                    persistConfigPatch({ embed_subtitles: runtimeConfig.embed_subtitles });
+                });
+            }
+            if (playlistFolderMode) {
+                playlistFolderMode.addEventListener('change', handlePlaylistFolderModeChange);
+            }
+            if (playlistFolderTemplate) {
+                playlistFolderTemplate.addEventListener('change', handlePlaylistFolderTemplateChange);
+            }
+
+            setQuickTab('auto');
+
+            await tryClipboardAutofill();
+
+            try {
+                const res = await fetch('/api/config');
+                const config = await res.json();
+                cachedConfig = config;
+                runtimeConfig = {
+                    ...runtimeConfig,
+                    ...config
+                };
+                viewMode = ['list', 'grouped', 'grid'].includes(config.ui_render_mode) ? config.ui_render_mode : 'list';
+                displayFilter = ['all', 'song', 'collection'].includes(config.ui_display_filter)
+                    ? config.ui_display_filter
+                    : (config.ui_albums_only_mode === true ? 'collection' : 'all');
+                currentSelectionFilter = ['all', 'song', 'collection'].includes(config.ui_selection_filter) ? config.ui_selection_filter : 'all';
+                currentSearchTerm = (config.ui_item_search || '').toString();
+                if (searchInput) searchInput.value = currentSearchTerm;
+                setVideoListHeight(config.ui_list_height || 560, false);
+                syncModeControls();
+                syncPlaylistFolderControls();
+                updateFilterButtons();
+                updateViewButtons();
+                updateDisplayFilterControl();
+            } catch (e) {
+                console.error('Error cargando config:', e);
+                setVideoListHeight(560, false);
+                syncModeControls();
+                syncPlaylistFolderControls();
+            }
+
+            await refreshQueuePanels();
+            setInterval(refreshQueuePanels, 8000);
+            renderQueueList();
+            renderHistoryList();
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/mini-player.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suite - YT-Descargar</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-top: #fff7ed;
+            --bg-mid: #ffe4d6;
+            --bg-bottom: #ffd7b8;
+            --ink: #211818;
+            --muted-ink: #6a5650;
+            --shadow-lg: 0 18px 60px rgba(104, 49, 23, .14);
+            --shadow-md: 0 10px 30px rgba(104, 49, 23, .10);
+        }
+        body {
+            font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(255,255,255,.72), transparent 34%),
+                radial-gradient(circle at right 18%, rgba(217,72,95,.14), transparent 26%),
+                linear-gradient(160deg, var(--bg-top) 0%, var(--bg-mid) 48%, var(--bg-bottom) 100%);
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .container { max-width: 1440px; margin: 0 auto; }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(255,255,255,.7);
+            border-radius: 24px;
+            padding: 20px 24px;
+            box-shadow: var(--shadow-md);
+        }
+        h1 { font-size: 30px; color: #2f1912; }
+        .muted { color: var(--muted-ink); font-size: 14px; margin-top: 6px; }
+        .btn {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #d9485f 0%, #f59e0b 100%);
+            color: #fff;
+        }
+        .hero-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, .95fr);
+            gap: 18px;
+            margin-bottom: 20px;
+        }
+        .hero-panel {
+            background: linear-gradient(135deg, rgba(40,22,17,.96) 0%, rgba(95,45,18,.92) 55%, rgba(217,72,95,.88) 100%);
+            color: #fff5ef;
+            border-radius: 28px;
+            padding: 28px;
+            box-shadow: var(--shadow-lg);
+        }
+        .hero-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.12);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 16px;
+        }
+        .hero-panel h2 {
+            font-size: 40px;
+            line-height: 1.04;
+            margin-bottom: 12px;
+        }
+        .hero-panel p {
+            color: rgba(255,245,239,.84);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .metric-card, .capability-item, .tool-card, .smart-tool {
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.16);
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: 800;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: rgba(255,245,239,.8);
+            line-height: 1.4;
+        }
+        .insight-panel, .card {
+            background: linear-gradient(180deg, rgba(255,255,255,.96) 0%, rgba(255,247,242,.96) 100%);
+            border: 1px solid rgba(137, 77, 47, .10);
+            border-radius: 28px;
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+        }
+        .insight-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #8a3412;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 12px;
+        }
+        .capability-list, .smart-tools {
+            display: grid;
+            gap: 12px;
+        }
+        .capability-item {
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .capability-item strong, .tool-card h3, .smart-tool strong {
+            display: block;
+            margin-bottom: 6px;
+            color: #35231b;
+        }
+        .capability-item span, .tool-card p, .smart-tool p {
+            font-size: 13px;
+            color: var(--muted-ink);
+            line-height: 1.5;
+        }
+        .tool-grid, .smart-tools {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .tool-card, .smart-tool {
+            background: #fff;
+            border: 1px solid rgba(137, 77, 47, .10);
+        }
+        .section-title {
+            font-size: 22px;
+            color: #2b1d16;
+            margin-bottom: 14px;
+        }
+        @media (max-width: 1180px) {
+            .hero-shell { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 900px) {
+            .hero-panel h2 { font-size: 30px; }
+            .hero-metrics, .tool-grid, .smart-tools { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="topbar">
+            <div>
+                <h1>Suite y Mejoras</h1>
+                <p class="muted">Aqui queda el contenido explicativo y de capacidades para no recargar la pantalla principal.</p>
+            </div>
+            <a href="/" class="btn btn-primary">Volver al descargador</a>
+        </div>
+
+        <div class="hero-shell">
+            <section class="hero-panel">
+                <div class="hero-kicker">Suite completa de descarga</div>
+                <h2>Convierte tu pagina en un hub mas completo para audio, video y lotes.</h2>
+                <p>
+                    La app ya tenia buena base para playlists y metadatos. Ahora la experiencia se organiza mejor:
+                    presets rapidos, modo audio o video, resolucion elegible, subtitulos y una presentacion mucho mas clara para uso diario.
+                </p>
+                <div class="hero-metrics">
+                    <div class="metric-card">
+                        <span class="metric-value">Audio</span>
+                        <span class="metric-label">MP3 y M4A con metadatos, portada y letras cuando existen.</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value">Video</span>
+                        <span class="metric-label">MP4 o MKV con resolucion rapida estilo app movil.</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value">Batch</span>
+                        <span class="metric-label">Playlists, artistas, filtros, seleccion por grupo y cola estable.</span>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="insight-panel">
+                <div class="insight-title">Mejoras detectadas</div>
+                <div class="capability-list">
+                    <div class="capability-item">
+                        <strong>Presentacion mas profesional</strong>
+                        <span>La propuesta de valor ahora se entiende antes de pegar una URL, con prioridades claras y mejor jerarquia visual.</span>
+                    </div>
+                    <div class="capability-item">
+                        <strong>Descarga rápida</strong>
+                        <span>Presets de conversion rapida para extraer audio o pasar a video con un clic.</span>
+                    </div>
+                    <div class="capability-item">
+                        <strong>Perfiles de video</strong>
+                        <span>Selector de resolucion, formato de video y subtitulos para descargas mas completas.</span>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <div class="card" style="margin-bottom: 20px;">
+            <h2 class="section-title">Herramientas</h2>
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <h3>Herramienta Audio</h3>
+                    <p>Extrae audio limpio con portada, organizacion inteligente y tags para biblioteca local.</p>
+                </div>
+                <div class="tool-card">
+                    <h3>Herramienta Video</h3>
+                    <p>Descarga en MP4 o MKV con resolucion rapida para reproducir en PC o movil.</p>
+                </div>
+                <div class="tool-card">
+                    <h3>Modo Batch</h3>
+                    <p>Filtra canciones, albums y grupos completos antes de lanzar la cola.</p>
+                </div>
+                <div class="tool-card">
+                    <h3>Metadatos Pro</h3>
+                    <p>Conserva artista, album, letras y caratulas cuando se detectan correctamente.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-title">Funciones Rapidas</h2>
+            <div class="smart-tools">
+                <div class="smart-tool">
+                    <strong>Subtitulos opcionales</strong>
+                    <p>En modo video puedes guardar subtitulos y, cuando sea viable, incrustarlos automaticamente.</p>
+                </div>
+                <div class="smart-tool">
+                    <strong>Portapapeles inteligente</strong>
+                    <p>Si detectamos un enlace de YouTube en el portapapeles, la app lo carga y analiza sola.</p>
+                </div>
+                <div class="smart-tool">
+                    <strong>Seleccion visual</strong>
+                    <p>Conservas filtros por tipo, vista agrupada y controles para playlists y canales grandes.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

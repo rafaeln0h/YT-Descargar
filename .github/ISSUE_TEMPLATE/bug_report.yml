@@ -1,0 +1,60 @@
+name: Reporte de error
+description: Informa un fallo reproducible de YT-Descargar
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No pegues cookies, tokens, URLs firmadas, rutas personales ni contenido privado.
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      placeholder: "0.012"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema operativo
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Comportamiento observado
+      description: Qué ocurrió y qué esperabas.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Pasos para reproducir
+      placeholder: |
+        1. Abrir...
+        2. Seleccionar...
+        3. Descargar...
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnóstico saneado
+      description: Versiones de Python, yt-dlp y FFmpeg, formato y últimas líneas relevantes del log.
+      render: shell
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: Eliminé secretos y datos personales.
+          required: true
+        - label: Usé contenido propio o autorizado.
+          required: true
+
