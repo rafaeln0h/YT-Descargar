@@ -39,7 +39,7 @@ ruff check app_playlist.py ymd tests
   strings sensibles.
 - Toda ruta recibida del cliente debe resolverse y validarse.
 - La UI no debe insertar títulos externos como HTML sin escapar.
-- Conserva compatibilidad con Python 3.10+.
+- Conserva compatibilidad con Python 3.11+.
 - Las nuevas capacidades deben exponer su estado en
   `/api/system/capabilities` cuando sean relevantes para clientes.
 

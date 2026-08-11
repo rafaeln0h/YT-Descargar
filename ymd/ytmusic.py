@@ -82,6 +82,154 @@ def _artist_names(value: Any) -> list[str]:
     return names
 
 
+def _best_thumbnail(value: Any) -> str:
+    thumbnails = value if isinstance(value, list) else []
+    valid = [item for item in thumbnails if isinstance(item, dict) and item.get("url")]
+    if not valid:
+        return ""
+    return str(max(valid, key=lambda item: (item.get("width") or 0) * (item.get("height") or 0))["url"])
+
+
+def _section_results(client: Any, section: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    preview = [item for item in section.get("results") or [] if isinstance(item, dict)]
+    browse_id = str(section.get("browseId") or "")
+    params = str(section.get("params") or "")
+    if browse_id and params and hasattr(client, "get_artist_albums"):
+        try:
+            complete = client.get_artist_albums(browse_id, params)
+            if isinstance(complete, list) and complete:
+                return [item for item in complete if isinstance(item, dict)]
+        except Exception as exc:
+            LOGGER.info("YouTube Music artist section could not be expanded: %s", exc)
+    return preview
+
+
+def _catalog_item(row: Mapping[str, Any], artist: str, default_type: str) -> dict[str, Any]:
+    playlist_id = str(row.get("playlistId") or row.get("audioPlaylistId") or "")
+    release_type = str(row.get("type") or default_type).strip() or default_type
+    normalized_type = _normalized(release_type)
+    if normalized_type == "album":
+        category = "album"
+    elif normalized_type in {"ep", "e p"}:
+        category = "ep"
+    elif normalized_type in {"single", "sencillo"}:
+        category = "single"
+    else:
+        category = "collection"
+    return {
+        "id": playlist_id or str(row.get("browseId") or ""),
+        "title": str(row.get("title") or "Lanzamiento"),
+        "artist": artist,
+        "album_artist": artist,
+        "album": str(row.get("title") or ""),
+        "year": str(row.get("year") or ""),
+        "thumbnail": _best_thumbnail(row.get("thumbnails")),
+        "url": f"https://music.youtube.com/playlist?list={playlist_id}" if playlist_id else "",
+        "item_type": "collection",
+        "collection_kind": "official_album",
+        "release_type": release_type,
+        "category": category,
+        "source": "ytmusic_catalog",
+        "selected_by_default": True,
+        "explicit": bool(row.get("isExplicit")) if row.get("isExplicit") is not None else None,
+    }
+
+
+def discover_ytmusic_artist_catalog(
+    *,
+    artist_name: str = "",
+    artist_browse_id: str = "",
+    channel_id: str = "",
+    client: Any | None = None,
+) -> dict[str, Any]:
+    """Discover the complete public album/single/EP catalog for an artist.
+
+    This uses unauthenticated ytmusicapi calls.  A channel ID is used to verify
+    search results when available so that an artist with a similar name is not
+    silently selected.
+    """
+
+    resolved_client = client or _load_client()
+    if resolved_client is None:
+        return {"status": "unavailable", "artist": artist_name, "items": []}
+
+    browse_id = str(artist_browse_id or "").strip()
+    if browse_id.startswith("MPADUC"):
+        browse_id = browse_id[4:]
+
+    try:
+        profile: Mapping[str, Any] = {}
+        if browse_id.startswith("UC"):
+            candidate = resolved_client.get_artist(browse_id)
+            if isinstance(candidate, dict):
+                profile = candidate
+        else:
+            results = resolved_client.search(artist_name, filter="artists", limit=10)
+            exact = [
+                item
+                for item in (results or [])
+                if isinstance(item, dict) and _normalized(item.get("artist")) == _normalized(artist_name)
+            ]
+            for result in exact:
+                candidate_id = str(result.get("browseId") or "")
+                if not candidate_id:
+                    continue
+                candidate = resolved_client.get_artist(candidate_id)
+                if not isinstance(candidate, dict):
+                    continue
+                if channel_id and str(candidate.get("channelId") or "") != str(channel_id):
+                    continue
+                browse_id = candidate_id
+                profile = candidate
+                break
+
+        if not profile:
+            return {"status": "not_found", "artist": artist_name, "items": []}
+
+        resolved_artist = str(profile.get("name") or artist_name or "Unknown")
+        items: list[dict[str, Any]] = []
+        for section_name, default_type in (("albums", "Album"), ("singles", "Single")):
+            section = profile.get(section_name) or {}
+            if not isinstance(section, dict):
+                continue
+            for row in _section_results(resolved_client, section):
+                item = _catalog_item(row, resolved_artist, default_type)
+                if item.get("url"):
+                    items.append(item)
+
+        deduped: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for item in items:
+            key = str(item.get("url") or item.get("id") or "")
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            deduped.append(item)
+
+        breakdown: dict[str, int] = {"album": 0, "single": 0, "ep": 0}
+        for item in deduped:
+            category = str(item.get("category") or "collection")
+            breakdown[category] = breakdown.get(category, 0) + 1
+
+        return {
+            "status": "ok",
+            "artist": resolved_artist,
+            "artist_browse_id": browse_id,
+            "releases_browse_id": str((profile.get("albums") or {}).get("browseId") or ""),
+            "thumbnail": _best_thumbnail(profile.get("thumbnails")),
+            "items": deduped,
+            "breakdown": breakdown,
+        }
+    except Exception as exc:
+        LOGGER.warning("ytmusicapi artist catalog lookup failed for %s: %s", artist_name or browse_id, exc)
+        return {
+            "status": "error",
+            "artist": artist_name,
+            "items": [],
+            "reason": type(exc).__name__,
+        }
+
+
 def _pick_track(album: Mapping[str, Any], metadata: Mapping[str, Any]) -> Mapping[str, Any]:
     tracks = [item for item in album.get("tracks") or [] if isinstance(item, dict)]
     youtube_id = str(metadata.get("youtube_id") or "")

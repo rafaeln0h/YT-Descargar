@@ -1,6 +1,6 @@
 import unittest
 
-from ymd.ytmusic import lookup_ytmusic_album, parse_ytmusic_album
+from ymd.ytmusic import discover_ytmusic_artist_catalog, lookup_ytmusic_album, parse_ytmusic_album
 
 
 class FakeYTMusic:
@@ -37,7 +37,58 @@ class FakeYTMusic:
         }
 
 
+class FakeArtistYTMusic:
+    def search(self, query, filter=None, limit=None):
+        return [{"artist": "Lilly Goodman", "browseId": "UCartist"}]
+
+    def get_artist(self, browse_id):
+        return {
+            "name": "Lilly Goodman",
+            "channelId": "UCchannel",
+            "thumbnails": [
+                {"url": "small", "width": 60, "height": 60},
+                {"url": "large", "width": 544, "height": 544},
+            ],
+            "albums": {"browseId": "MPADUCartist", "params": "albums", "results": []},
+            "singles": {"browseId": "MPADUCartist", "params": "singles", "results": []},
+        }
+
+    def get_artist_albums(self, browse_id, params):
+        if params == "albums":
+            return [{
+                "title": "Cielo",
+                "playlistId": "OLAK5uy_album",
+                "type": "Album",
+                "year": "2021",
+                "thumbnails": [{"url": "album-cover", "width": 544, "height": 544}],
+            }]
+        return [
+            {"title": "Soy Sana", "playlistId": "OLAK5uy_ep", "type": "EP", "year": "2024"},
+            {"title": "Vida Nueva", "playlistId": "OLAK5uy_single", "type": "Single", "year": "2020"},
+        ]
+
 class YTMusicTests(unittest.TestCase):
+    def test_discovers_verified_artist_releases_with_types_and_years(self):
+        result = discover_ytmusic_artist_catalog(
+            artist_name="Lilly Goodman",
+            channel_id="UCchannel",
+            client=FakeArtistYTMusic(),
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["artist"], "Lilly Goodman")
+        self.assertEqual(result["breakdown"], {"album": 1, "single": 1, "ep": 1})
+        self.assertEqual([item["category"] for item in result["items"]], ["album", "ep", "single"])
+        self.assertTrue(all(item["artist"] == "Lilly Goodman" for item in result["items"]))
+        self.assertTrue(all(item["collection_kind"] == "official_album" for item in result["items"]))
+
+    def test_resolves_release_section_browse_id_without_search(self):
+        result = discover_ytmusic_artist_catalog(
+            artist_browse_id="MPADUCartist",
+            client=FakeArtistYTMusic(),
+        )
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["artist_browse_id"], "UCartist")
+
     def test_parses_album_and_exact_track_without_guessing_credits(self):
         fields = parse_ytmusic_album(
             FakeYTMusic().get_album("MPREb_album"),

@@ -305,7 +305,24 @@
                     <div class="form-group">
                         <label class="form-label">Carpeta</label>
                         <input type="text" id="folderStructure" class="form-input" value="{album_artist}/{year} - {album}">
-                        <div class="hint">Plantilla base para canciones individuales o cuando la playlist usa modo heredado.</div>
+                        <div class="hint">Plantilla base para canciones individuales, albumes, EP o cuando la playlist usa modo heredado.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Organizacion de sencillos</label>
+                        <select id="singleFolderMode" class="form-select">
+                            <option value="by_artist">Todos los sencillos en una carpeta por artista</option>
+                            <option value="by_artist_year">Sencillos por artista y ano</option>
+                            <option value="per_release">Una carpeta por lanzamiento</option>
+                            <option value="custom">Personalizado (plantilla manual)</option>
+                        </select>
+                        <div class="hint">Solo afecta lanzamientos identificados como Single o Sencillo. Los albumes y EP conservan su carpeta.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Plantilla personalizada para sencillos</label>
+                        <input type="text" id="singleFolderTemplate" class="form-input" placeholder="Ej: {album_artist}/Singles/{year}">
+                        <div class="hint">Variables utiles: <code>{artist}</code>, <code>{album_artist}</code>, <code>{album}</code> y <code>{year}</code>.</div>
                     </div>
 
                     <div class="form-group">
@@ -342,6 +359,7 @@
 
                     <div class="preview-box">
                         <div class="preview-title">Vista previa de resultado</div>
+                        <div class="preview-line" id="trackPreview"></div>
                         <div class="preview-line" id="singlePreview"></div>
                         <div class="preview-line" id="playlistPreview"></div>
                         <div class="hint">La vista previa se actualiza automaticamente mientras cambias opciones.</div>
@@ -527,8 +545,18 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Cliente de YouTube</label>
-                        <input type="text" id="youtubePlayerClient" class="form-input" value="default,web_music">
-                        <div class="hint">Ejemplo recomendado: <code>default,web_music</code></div>
+                        <input type="text" id="youtubePlayerClient" class="form-input" value="auto">
+                        <div class="hint"><code>auto</code> evita forzar clientes que requieren PO Token. Usa una lista sólo para diagnóstico avanzado.</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Runtime JavaScript</label>
+                        <select id="youtubeJsRuntime" class="form-select">
+                            <option value="auto">Automático (Deno, luego Node)</option>
+                            <option value="deno">Deno</option>
+                            <option value="node">Node.js</option>
+                            <option value="none">Deshabilitado</option>
+                        </select>
+                        <div class="hint">Necesario junto con <code>yt-dlp-ejs</code> para el soporte completo de YouTube.</div>
                     </div>
                 </div>
 
@@ -581,6 +609,15 @@
             </label>
             <div class="actions" style="margin-top:12px;">
                 <button class="btn btn-secondary" type="button" onclick="checkUpdateNow()">Comprobar ahora</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Diagnóstico del motor</h2>
+            <p class="section-copy">Comprueba las versiones activas y los componentes requeridos por yt-dlp.</p>
+            <div id="engineDiagnostics" class="panel" style="white-space:pre-line;">Consultando componentes...</div>
+            <div class="actions" style="margin-top:12px;">
+                <button class="btn btn-secondary" type="button" onclick="loadEngineDiagnostics()">Volver a comprobar</button>
             </div>
         </div>
 
@@ -665,6 +702,8 @@
             document.getElementById('embedExtendedMetadata').checked = config.embed_extended_metadata !== false;
             document.getElementById('downloadPath').value = config.download_path || '';
             document.getElementById('folderStructure').value = config.folder_structure || '{album_artist}/{year} - {album}';
+            document.getElementById('singleFolderMode').value = config.single_folder_mode || 'by_artist';
+            document.getElementById('singleFolderTemplate').value = config.single_folder_template || '';
             document.getElementById('playlistFolderMode').value = config.playlist_folder_mode || 'smart';
             document.getElementById('playlistFolderTemplate').value = config.playlist_folder_template || '';
             document.getElementById('filenameFormat').value = config.filename_format || '{track:02d} {title}';
@@ -701,13 +740,15 @@
             document.getElementById('cookiesProfile').value = config.cookies_profile || '';
             document.getElementById('useDownloadArchive').checked = config.use_download_archive !== false;
             document.getElementById('archiveFile').value = config.archive_file || '';
-            document.getElementById('youtubePlayerClient').value = config.youtube_player_client || 'default,web_music';
+            document.getElementById('youtubePlayerClient').value = config.youtube_player_client || 'auto';
+            document.getElementById('youtubeJsRuntime').value = config.youtube_js_runtime || 'auto';
             document.getElementById('retryCount').value = config.retry_count ?? 10;
             document.getElementById('fragmentRetries').value = config.fragment_retries ?? 10;
             document.getElementById('concurrentFragments').value = config.concurrent_fragments ?? 1;
             document.getElementById('sleepInterval').value = config.sleep_interval ?? 0;
             document.getElementById('maxSleepInterval').value = config.max_sleep_interval ?? 0;
             document.getElementById('checkForUpdates').checked = config.check_for_updates !== false;
+            updateSingleTemplateState();
             updatePlaylistTemplateState();
             updateStructurePreview();
         }
@@ -722,6 +763,8 @@
                 embed_extended_metadata: document.getElementById('embedExtendedMetadata').checked,
                 download_path: document.getElementById('downloadPath').value,
                 folder_structure: document.getElementById('folderStructure').value,
+                single_folder_mode: document.getElementById('singleFolderMode').value,
+                single_folder_template: document.getElementById('singleFolderTemplate').value,
                 playlist_folder_mode: document.getElementById('playlistFolderMode').value,
                 playlist_folder_template: document.getElementById('playlistFolderTemplate').value,
                 filename_format: document.getElementById('filenameFormat').value,
@@ -760,6 +803,7 @@
                 use_download_archive: document.getElementById('useDownloadArchive').checked,
                 archive_file: document.getElementById('archiveFile').value,
                 youtube_player_client: document.getElementById('youtubePlayerClient').value,
+                youtube_js_runtime: document.getElementById('youtubeJsRuntime').value,
                 retry_count: Number(document.getElementById('retryCount').value || 10),
                 fragment_retries: Number(document.getElementById('fragmentRetries').value || 10),
                 concurrent_fragments: Number(document.getElementById('concurrentFragments').value || 1),
@@ -866,6 +910,49 @@
             return playlistFolderPresets[mode] || form.folder_structure || '{artist}/{year} - {album}';
         }
 
+        async function loadEngineDiagnostics() {
+            const target = document.getElementById('engineDiagnostics');
+            target.textContent = 'Consultando componentes...';
+            try {
+                const response = await fetch('/api/system/capabilities', { cache: 'no-store' });
+                const payload = await response.json();
+                if (!response.ok || !payload.runtime) throw new Error(payload.error || `HTTP ${response.status}`);
+                const runtime = payload.runtime;
+                const js = runtime.javascript || {};
+                const yt = runtime.yt_dlp || {};
+                const ffmpeg = runtime.ffmpeg || {};
+                const provider = runtime.youtube?.po_token_provider || [];
+                const lines = [
+                    `${runtime.status === 'ready' ? '✓' : '⚠'} Estado: ${runtime.status === 'ready' ? 'listo' : 'requiere atención'}`,
+                    `Python: ${runtime.python?.version || 'no detectado'}`,
+                    `yt-dlp: ${yt.version || 'no instalado'}`,
+                    `yt-dlp-ejs: ${yt.ejs_version || 'no instalado'}`,
+                    `curl-cffi: ${yt.curl_cffi_version || 'no instalado'}`,
+                    `JavaScript: ${js.selected || 'ninguno'} (${js.requested || 'auto'})`,
+                    `FFmpeg: ${ffmpeg.available && ffmpeg.ffprobe_available ? 'disponible' : 'incompleto'}`,
+                    `Cliente YouTube: ${runtime.youtube?.player_client || 'auto'}`,
+                    `Proveedor PO Token: ${provider.length ? provider.map((item) => `${item.name} ${item.version}`).join(', ') : 'no instalado (opcional)'}`
+                ];
+                for (const warning of runtime.warnings || []) lines.push(`Aviso: ${warning}`);
+                target.textContent = lines.join('\n');
+            } catch (error) {
+                target.textContent = `No se pudo obtener el diagnóstico: ${error.message}`;
+            }
+        }
+
+        function getSingleTemplate(form) {
+            const mode = (form.single_folder_mode || 'by_artist').toLowerCase();
+            if (mode === 'per_release') return form.folder_structure || '{album_artist}/{year} - {album}';
+            if (mode === 'by_artist_year') return '{album_artist}/Singles/{year}';
+            if (mode === 'custom') return form.single_folder_template || '{album_artist}/Singles';
+            return '{album_artist}/Singles';
+        }
+
+        function updateSingleTemplateState() {
+            const mode = document.getElementById('singleFolderMode').value;
+            document.getElementById('singleFolderTemplate').disabled = mode !== 'custom';
+        }
+
         function updatePlaylistTemplateState() {
             const mode = document.getElementById('playlistFolderMode').value;
             const customInput = document.getElementById('playlistFolderTemplate');
@@ -875,13 +962,15 @@
         function updateStructurePreview() {
             const form = getFormConfig();
             const basePath = (form.download_path || 'C:/Users/TuUsuario/Music/YouTube').trim();
-            const folderSingle = applyTemplate(form.folder_structure, previewSample, '{artist}/{year} - {album}');
+            const folderTrack = applyTemplate(form.folder_structure, previewSample, '{artist}/{year} - {album}');
+            const folderSingle = applyTemplate(getSingleTemplate(form), previewSample, '{album_artist}/Singles');
             const playlistTemplate = getPlaylistTemplate(form);
             const folderPlaylist = applyTemplate(playlistTemplate, previewSample, '{artist}/{year} - {album}');
             const fileName = applyTemplate(form.filename_format, previewSample, '{track:02d} {title}');
             const playlistFileName = applyTemplate(form.playlist_filename_format, previewSample, '{playlist_track:02d} - {title}');
 
-            document.getElementById('singlePreview').textContent = `Cancion individual -> ${basePath}/${folderSingle}/${fileName}.mp3`;
+            document.getElementById('trackPreview').textContent = `Cancion individual -> ${basePath}/${folderTrack}/${fileName}.mp3`;
+            document.getElementById('singlePreview').textContent = `Sencillo oficial -> ${basePath}/${folderSingle}/${fileName}.mp3`;
             document.getElementById('playlistPreview').textContent = `Playlist normal -> ${basePath}/${folderPlaylist}/${playlistFileName}.mp3`;
         }
 
@@ -1023,6 +1112,8 @@
             const ids = [
                 'downloadPath',
                 'folderStructure',
+                'singleFolderMode',
+                'singleFolderTemplate',
                 'playlistFolderMode',
                 'playlistFolderTemplate',
                 'filenameFormat',
@@ -1032,10 +1123,12 @@
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.addEventListener('input', () => {
+                    if (id === 'singleFolderMode') updateSingleTemplateState();
                     if (id === 'playlistFolderMode') updatePlaylistTemplateState();
                     updateStructurePreview();
                 });
                 el.addEventListener('change', () => {
+                    if (id === 'singleFolderMode') updateSingleTemplateState();
                     if (id === 'playlistFolderMode') updatePlaylistTemplateState();
                     updateStructurePreview();
                 });
@@ -1045,6 +1138,7 @@
         window.addEventListener('load', () => {
             bindPreviewEvents();
             loadConfig();
+            loadEngineDiagnostics();
         });
     </script>
     <script src="{{ url_for('static', filename='js/app-shell.js') }}"></script>

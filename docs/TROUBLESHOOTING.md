@@ -7,6 +7,8 @@
 3. Revisa `logs/ymd.log` o `/api/system/logs?limit=300`.
 4. Comprueba FFmpeg con `ffmpeg_portable\bin\ffmpeg.exe -version`.
 5. Si el video requiere sesión, configura navegador y perfil en Ajustes.
+6. Abre Configuración → Sistema → Diagnóstico del motor y confirma que
+   `yt-dlp-ejs`, un runtime JavaScript y FFmpeg aparezcan disponibles.
 
 No publiques cookies ni el contenido completo de perfiles del navegador.
 
@@ -18,6 +20,11 @@ No publiques cookies ni el contenido completo de perfiles del navegador.
 - Usa cookies solo desde un perfil que controles.
 - Algunos formatos requieren un runtime JavaScript moderno; revisa el log de
   yt-dlp antes de cambiar clientes a ciegas.
+- Conserva el cliente de YouTube en `auto`. No fuerces `web_music` sin un proveedor
+  de PO Token: yt-dlp omitirá formatos afectados y puede recibir HTTP 403.
+- Los PO Tokens manuales vinculados a un video no son una solución permanente.
+  Si el modo automático continúa fallando, evalúa un proveedor recomendado por
+  yt-dlp como plugin opcional y revisa primero su código y requisitos.
 
 ## “320 kbps” suena igual o peor
 
@@ -37,4 +44,3 @@ la información. Prueba M4A u OPUS para evitar conversiones adicionales.
 - Un valor detectado tiene prioridad sobre los defaults.
 - MusicBrainz, Cover Art Archive o Deezer pueden fallar temporalmente; la
   descarga continúa y el fallo queda en el log.
-

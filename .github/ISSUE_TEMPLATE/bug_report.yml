@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: Versión
-      placeholder: "0.012"
+      placeholder: "0.013"
     validations:
       required: true
   - type: dropdown
@@ -57,4 +57,3 @@ body:
           required: true
         - label: Usé contenido propio o autorizado.
           required: true
-

@@ -397,6 +397,46 @@ body.ymd-app-page::before {
 .ymd-settings-page .ymd-save-dock .actions { margin: 0 !important; }
 .ymd-settings-page .status { color: var(--ymd-green) !important; }
 
+.catalog-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+    gap: 10px;
+    margin: 14px 0;
+}
+.catalog-stat {
+    display: grid;
+    gap: 3px;
+    padding: 12px 14px;
+    color: var(--ymd-text);
+    text-align: left;
+    background: rgba(255, 255, 255, .045);
+    border: 1px solid var(--ymd-border);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+.catalog-stat:hover { transform: translateY(-2px); border-color: rgba(255, 0, 51, .62); background: rgba(255, 0, 51, .09); }
+.catalog-stat strong { color: #fff !important; font-size: 22px; }
+.catalog-stat span { color: var(--ymd-muted); font-size: 12px; }
+
+.download-reminder {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 16px 0;
+    padding: 15px 17px;
+    color: var(--ymd-text);
+    background: linear-gradient(135deg, rgba(255, 0, 51, .15), rgba(255, 255, 255, .045));
+    border: 1px solid rgba(255, 0, 51, .42);
+    border-radius: 16px;
+}
+.download-reminder > div { display: grid; gap: 4px; }
+.download-reminder strong { color: #fff !important; }
+.download-reminder span { color: var(--ymd-muted); font-size: 13px; }
+.download-reminder[data-state="completed"] { border-color: rgba(52, 211, 153, .52); background: rgba(52, 211, 153, .09); }
+.download-reminder[data-state="error"] { border-color: rgba(251, 113, 133, .7); }
+
 ::view-transition-old(root),
 ::view-transition-new(root) { animation-duration: .25s; }
 
@@ -409,6 +449,7 @@ body.ymd-app-page::before {
     .ymd-app-page .header-actions { width: 100%; justify-content: flex-start !important; }
     .ymd-primary-tabs { justify-content: flex-start; width: 100%; border-radius: 16px; }
     .ymd-settings-page .ymd-save-dock { align-items: flex-start; flex-direction: column; }
+    .download-reminder { align-items: flex-start; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

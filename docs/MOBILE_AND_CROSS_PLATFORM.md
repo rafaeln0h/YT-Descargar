@@ -3,7 +3,8 @@
 ## Estado actual
 
 El backend Python/Flask, yt-dlp y FFmpeg funciona como aplicación local en
-Windows, Linux y macOS, pero v0.012 se valida primero en Windows. La UI web ya
+Windows, Linux y macOS; v0.013 se valida en Windows y mediante CI en Windows y
+Ubuntu con Python 3.11 y 3.13. La UI web ya
 separa parcialmente cliente, biblioteca y servicios, lo que reduce el trabajo
 para nuevos frontends.
 

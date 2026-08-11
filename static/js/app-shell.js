@@ -115,18 +115,144 @@
         return value;
     }
 
+    function canonicalQueueUrl(rawUrl) {
+        const raw = String(rawUrl || "").trim();
+        if (!raw) return "";
+        try {
+            const parsed = new URL(raw, window.location.origin);
+            const important = new URLSearchParams();
+            ["v", "list"].forEach((key) => {
+                if (parsed.searchParams.get(key)) important.set(key, parsed.searchParams.get(key));
+            });
+            const pathname = parsed.pathname.replace(/\/+$/, "");
+            const query = important.toString();
+            return `${parsed.hostname.toLowerCase()}${pathname}${query ? `?${query}` : ""}`;
+        } catch (_error) {
+            return raw.toLowerCase();
+        }
+    }
+
+    function queueSignature(item, local = false) {
+        if (local && item.signature) return String(item.signature);
+        const payload = item.request_payload || item.payload || {};
+        const type = String(item.type || item.kind || "single").toLowerCase();
+        const sourceUrl = item.source_url || payload.url || item.url || "";
+        return `${type}|${canonicalQueueUrl(sourceUrl)}`;
+    }
+
+    function timestampMs(item, local = false) {
+        const explicit = local ? (item.createdAt || item.updatedAt) : (item.updated_at || item.created_at);
+        const numeric = Number(explicit || 0);
+        if (Number.isFinite(numeric) && numeric > 0) return numeric;
+        const parsed = Date.parse(explicit || "");
+        if (Number.isFinite(parsed)) return parsed;
+        if (local) {
+            const match = String(item.uiId || "").match(/^job_(\d+)/);
+            if (match) return Number(match[1]);
+        }
+        return 0;
+    }
+
+    function reconcileLocalPending(backendItems = [], historyItems = []) {
+        let saved;
+        try {
+            saved = JSON.parse(localStorage.getItem("ymd.pendingQueue") || "[]");
+        } catch (_error) {
+            return { jobs: [], removed: 0 };
+        }
+        if (!Array.isArray(saved) || !saved.length) return { jobs: Array.isArray(saved) ? saved : [], removed: 0 };
+
+        const activeSignatures = new Set();
+        const completedAt = new Map();
+        [...backendItems, ...historyItems].forEach((item) => {
+            const signature = queueSignature(item);
+            if (!signature.endsWith("|")) {
+                const status = normalizedStatus(item);
+                if (status === "active") activeSignatures.add(signature);
+                if (status === "completed") {
+                    completedAt.set(signature, Math.max(completedAt.get(signature) || 0, timestampMs(item)));
+                }
+            }
+        });
+
+        const jobs = saved.filter((job) => {
+            const status = String(job.localStatus || "pending").toLowerCase();
+            if (!["pending", "processing", "paused"].includes(status)) return true;
+            const signature = queueSignature(job, true);
+            if (activeSignatures.has(signature)) return false;
+            const backendTime = completedAt.get(signature);
+            if (backendTime === undefined) return true;
+            const localTime = timestampMs(job, true);
+            return localTime > 0 && backendTime > 0 && localTime > backendTime;
+        });
+        const removed = saved.length - jobs.length;
+        if (removed) {
+            localStorage.setItem("ymd.pendingQueue", JSON.stringify(jobs));
+            window.dispatchEvent(new CustomEvent("ymd:pending-queue-reconciled", {
+                detail: { jobs, removed },
+            }));
+        }
+        return { jobs, removed };
+    }
+
+    function updateActivityIndicator(items) {
+        const activeItems = items.filter((item) => normalizedStatus(item) === "active");
+        let localPending = 0;
+        try {
+            const saved = JSON.parse(localStorage.getItem("ymd.pendingQueue") || "[]");
+            localPending = Array.isArray(saved)
+                ? saved.filter((item) => String(item.localStatus || "pending") === "pending").length
+                : 0;
+        } catch (_error) {
+            localPending = 0;
+        }
+        const totalAttention = activeItems.length + localPending;
+        const tabBadge = document.getElementById("downloadTabBadge");
+        if (tabBadge) {
+            tabBadge.textContent = String(totalAttention);
+            tabBadge.hidden = totalAttention === 0;
+            tabBadge.setAttribute("aria-label", `${activeItems.length} descargas activas y ${localPending} pendientes`);
+        }
+
+        let popout = document.getElementById("ymdDownloadPopout");
+        if (!totalAttention) {
+            popout?.remove();
+            return;
+        }
+        if (!popout) {
+            popout = document.createElement("a");
+            popout.id = "ymdDownloadPopout";
+            popout.className = "ymd-download-popout";
+            popout.href = "/#activity";
+            popout.innerHTML = '<span class="ymd-download-pulse" aria-hidden="true"></span><span><strong></strong><small></small></span>';
+            document.body.appendChild(popout);
+        }
+        const first = activeItems[0] || {};
+        const progress = Number(first.progress || 0);
+        popout.querySelector("strong").textContent = activeItems.length
+            ? (activeItems.length === 1 ? "1 descarga activa" : `${activeItems.length} descargas activas`)
+            : (localPending === 1 ? "1 tarea pendiente" : `${localPending} tareas pendientes`);
+        popout.querySelector("small").textContent = activeItems.length
+            ? `${first.title || first.label || "Procesando"}${progress ? ` · ${progress}%` : ""} · Ver progreso`
+            : "Falta pulsar Iniciar cola · Ir a Descargas";
+    }
+
     async function pollQueueEvents() {
         try {
-            const [queueResponse, batchResponse] = await Promise.all([
+            const [queueResponse, batchResponse, historyResponse] = await Promise.all([
                 fetch("/api/queue", { cache: "no-store" }),
                 fetch("/api/batch-queue", { cache: "no-store" }),
+                fetch("/api/history", { cache: "no-store" }),
             ]);
             const queue = queueResponse.ok ? await queueResponse.json() : [];
             const batch = batchResponse.ok ? await batchResponse.json() : [];
+            const history = historyResponse.ok ? await historyResponse.json() : [];
             const items = [
                 ...queue.map((item) => ({ ...item, eventId: `queue-${item.queue_id}` })),
                 ...batch.map((item) => ({ ...item, eventId: `batch-${item.job_id}` })),
             ];
+            reconcileLocalPending(items, history);
+            updateActivityIndicator(items);
             const previous = readJson(STATE_KEY, {});
             const current = {};
             let active = 0;
@@ -299,6 +425,8 @@
         requestNotifications,
         saveNotificationPreferences: savePreferences,
         checkForUpdates,
+        refreshDownloadStatus: pollQueueEvents,
+        reconcileLocalPending,
         toast,
     };
 

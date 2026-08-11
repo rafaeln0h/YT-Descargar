@@ -86,11 +86,13 @@ class RouteTests(unittest.TestCase):
         response = self.client.get("/api/system/capabilities")
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertEqual(payload["version"], "0.012")
+        self.assertEqual(payload["version"], "0.013")
         self.assertTrue(payload["features"]["extended_metadata"])
         self.assertIn("musicbrainz", payload["metadata_sources"])
         self.assertEqual(payload["lyrics_sources"], ["youtube_captions", "lrclib"])
         self.assertFalse(payload["features"]["metadata_sidecar"])
+        self.assertIn("yt_dlp", payload["runtime"])
+        self.assertIn("javascript", payload["runtime"])
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import re
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -43,7 +43,9 @@ from ymd.metadata import (
 from ymd.overrides import apply_metadata_overrides, load_overrides, upsert_override
 from ymd.repair import repair_library as repair_media_library
 from ymd.routes import create_services_blueprint
+from ymd.runtime import normalize_player_client, youtube_extractor_args, yt_dlp_runtime_options
 from ymd.version import VERSION
+from ymd.ytmusic import discover_ytmusic_artist_catalog
 
 # Asegurar que FFmpeg este disponible
 FFMPEG_PATH = ensure_ffmpeg()
@@ -69,6 +71,8 @@ DOWNLOAD_QUEUE = {}
 QUEUE_ID = 0
 QUEUE_LOCK = threading.Lock()
 HISTORY_LOCK = threading.Lock()
+APP_STARTED_AT = datetime.now()
+ACTIVE_DOWNLOAD_STATES = {'iniciando', 'analizando', 'descargando', 'pausado'}
 BATCH_LOCK = threading.Lock()
 BATCH_WAKE = threading.Event()
 BATCH_JOBS = []
@@ -101,6 +105,8 @@ DEFAULT_CONFIG = {
     'archive_file': str(Path.home() / '.ymd_download_archive.txt'),
     'folder_structure': '{album_artist}/{year} - {album}',
     'filename_format': '{track:02d} - {title}',
+    'single_folder_mode': 'by_artist',
+    'single_folder_template': '',
     'playlist_filename_format': '{playlist_track:02d} - {title}',
     'playlist_folder_mode': 'smart',
     'playlist_folder_template': '',
@@ -122,7 +128,8 @@ DEFAULT_CONFIG = {
     'use_download_archive': True,
     'cookies_from_browser': '',
     'cookies_profile': '',
-    'youtube_player_client': 'default,web_music',
+    'youtube_player_client': 'auto',
+    'youtube_js_runtime': 'auto',
     'retry_count': 10,
     'fragment_retries': 10,
     'concurrent_fragments': 1,
@@ -196,15 +203,26 @@ def load_history():
                 loaded = json.load(f)
                 if isinstance(loaded, list):
                     return loaded
-        except Exception:
+        except Exception as exc:
+            LOGGER.warning("No se pudo leer el historial persistente %s: %s", HISTORY_FILE, exc)
             return []
     return []
 
 
 def save_history(items):
     trimmed = list(items)[-200:]
-    with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(trimmed, f, indent=2, ensure_ascii=False)
+    HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temp_file = HISTORY_FILE.with_name(
+        f'.{HISTORY_FILE.name}.{os.getpid()}.{threading.get_ident()}.tmp'
+    )
+    try:
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            json.dump(trimmed, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, HISTORY_FILE)
+    finally:
+        temp_file.unlink(missing_ok=True)
 
 
 def add_history_entry(entry):
@@ -233,6 +251,82 @@ def get_history_entry(history_id):
     return None
 
 
+def common_media_root(media_files):
+    parents = []
+    for raw_path in media_files or []:
+        try:
+            parents.append(str(Path(raw_path).expanduser().resolve().parent))
+        except (OSError, TypeError, ValueError):
+            continue
+    if not parents:
+        return ''
+    try:
+        return os.path.commonpath(parents)
+    except ValueError:
+        return ''
+
+
+def reconcile_orphaned_history(items=None):
+    """Marca como interrumpidas las descargas persistidas que ya no tienen worker.
+
+    La cola de descarga vive en memoria, mientras que el historial sobrevive a un
+    reinicio. Sin esta reconciliacion, una tarea activa al cerrar la aplicacion
+    queda mostrando velocidad, ETA y estado ``descargando`` indefinidamente.
+    """
+    with HISTORY_LOCK:
+        history_items = load_history() if items is None else list(items)
+        active_history_ids = {
+            queue.get('history_id')
+            for queue in DOWNLOAD_QUEUE.values()
+            if is_active_queue_status(queue.get('status')) and queue.get('history_id')
+        }
+        now = datetime.now()
+        stale_before = now - timedelta(minutes=2)
+        changed_ids = []
+
+        for item in history_items:
+            if item.get('status') not in ACTIVE_DOWNLOAD_STATES:
+                continue
+            history_id = item.get('history_id')
+            if history_id in active_history_ids:
+                continue
+
+            timestamp = item.get('updated_at') or item.get('created_at') or ''
+            try:
+                last_update = datetime.fromisoformat(timestamp)
+            except (TypeError, ValueError):
+                last_update = None
+
+            # Las entradas anteriores a este proceso son huerfanas de inmediato.
+            # La gracia adicional evita una carrera mientras se crea un worker.
+            if last_update and last_update > APP_STARTED_AT and last_update > stale_before:
+                continue
+
+            recovered_patch = {
+                'status': 'interrumpido',
+                'speed': '',
+                'eta': '',
+                'message': 'La descarga se interrumpio al cerrar o reiniciar la aplicacion.',
+                'note': 'Los archivos descargados se conservan. Valida la carpeta o reintenta para continuar con los faltantes.',
+                'interrupted_at': now.isoformat(timespec='seconds'),
+                'updated_at': now.isoformat(timespec='seconds'),
+            }
+            destination_root = common_media_root(item.get('media_files'))
+            if destination_root:
+                recovered_patch['destination_root'] = destination_root
+            item.update(recovered_patch)
+            changed_ids.append(history_id or 'sin-id')
+
+        if changed_ids:
+            save_history(history_items)
+            LOGGER.warning(
+                "Historial reconciliado: %s descarga(s) sin worker marcada(s) como interrumpida(s): %s",
+                len(changed_ids),
+                ', '.join(changed_ids),
+            )
+        return history_items
+
+
 def next_queue_id():
     global QUEUE_ID
     with QUEUE_LOCK:
@@ -241,7 +335,7 @@ def next_queue_id():
 
 
 def is_active_queue_status(status):
-    return status in {'iniciando', 'analizando', 'descargando', 'pausado'}
+    return status in ACTIVE_DOWNLOAD_STATES
 
 
 def find_active_duplicate_queue(kind, source_url):
@@ -499,6 +593,9 @@ def load_config():
                     loaded.pop('write_metadata_json', None)
                     merged = dict(DEFAULT_CONFIG)
                     merged.update(loaded)
+                    merged['youtube_player_client'] = normalize_player_client(
+                        merged.get('youtube_player_client')
+                    )
                     merged['metadata_defaults'] = {
                         **DEFAULT_CONFIG['metadata_defaults'],
                         **(loaded.get('metadata_defaults') or {}),
@@ -553,7 +650,7 @@ def apply_automatic_metadata_enrichment(metadata, config, *, audio_path=None, de
 
 
 app.register_blueprint(
-    create_services_blueprint(load_config, log_path=APPLICATION_LOG)
+    create_services_blueprint(load_config, log_path=APPLICATION_LOG, ffmpeg_path=FFMPEG_PATH)
 )
 
 
@@ -572,6 +669,7 @@ def build_runtime_config(request_data):
         'cookies_from_browser',
         'cookies_profile',
         'youtube_player_client',
+        'youtube_js_runtime',
         'playlist_tag_album_mode',
         'playlist_tag_artist_mode',
         'playlist_tag_album_artist_mode',
@@ -580,6 +678,8 @@ def build_runtime_config(request_data):
         'playlist_default_genre',
         'folder_structure',
         'filename_format',
+        'single_folder_mode',
+        'single_folder_template',
         'playlist_filename_format',
         'playlist_folder_mode',
         'playlist_folder_template',
@@ -756,7 +856,14 @@ def classify_entry_type(url):
     if not url:
         return 'song'
     low = url.lower()
-    if '/channel/' in low or '/browse/' in low:
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+    if (
+        '/channel/' in low
+        or '/browse/' in low
+        or path.startswith(('/@', '/c/', '/user/'))
+        or path.endswith(('/videos', '/streams', '/shorts', '/live', '/playlists', '/albums', '/songs'))
+    ):
         return 'artist'
     if '/playlist' in low or ('watch' in low and 'list=' in low):
         return 'collection'
@@ -946,16 +1053,31 @@ def resolve_music_browse_items(url):
                 continue
             title = get_text_runs(row.get('title')) or f'Coleccion {idx}'
             subtitle = get_text_runs(row.get('subtitle'))
-            artist = subtitle.split(' • ')[0].strip() if subtitle else 'Unknown'
+            subtitle_parts = [part.strip() for part in subtitle.split(' • ') if part.strip()]
+            release_type = subtitle_parts[0] if subtitle_parts else 'Coleccion'
+            year = next((part for part in reversed(subtitle_parts) if re.fullmatch(r'\d{4}', part)), '')
+            normalized_release_type = release_type.casefold()
+            category = (
+                'album' if 'álbum' in normalized_release_type or 'album' in normalized_release_type
+                else 'ep' if normalized_release_type == 'ep'
+                else 'single' if 'sencillo' in normalized_release_type or 'single' in normalized_release_type
+                else 'collection'
+            )
             items.append({
                 'id': playlist_id,
                 'title': title,
-                'artist': artist or 'Unknown',
+                'artist': 'Unknown',
+                'album': title,
+                'year': year,
+                'release_type': release_type,
+                'category': category,
+                'collection_kind': 'official_album',
                 'thumbnail': pick_best_thumbnail(row.get('thumbnailRenderer') or row),
                 'url': f'https://music.youtube.com/playlist?list={playlist_id}',
                 'position': idx,
                 'item_type': 'collection',
                 'source': 'browse_fallback',
+                'selected_by_default': True,
             })
 
         items = dedupe_items(items)
@@ -977,17 +1099,12 @@ def discover_music_artist_items(url):
     (albumes/singles/playlists) y canciones visibles.
     """
     base = url.rstrip('/')
-    candidates = [
-        ('main', base),
-        ('albums', f"{base}/albums"),
-        ('songs', f"{base}/songs"),
-        ('videos', f"{base}/videos"),
-        ('playlists', f"{base}/playlists"),
-    ]
+    candidates = [('main', base), ('videos', f"{base}/videos"), ('playlists', f"{base}/playlists")]
 
     discovered = []
     title = ''
     artist = 'Unknown'
+    channel_id = ''
 
     for source, candidate in candidates:
         info = extract_url_info(candidate, url_type='channel', timeout=18)
@@ -995,15 +1112,61 @@ def discover_music_artist_items(url):
             continue
         title = title or info.get('title') or info.get('uploader') or ''
         artist = info.get('uploader') or info.get('artist') or title or artist
+        channel_id = channel_id or info.get('channel_id') or ''
         entries = info.get('entries') or []
-        discovered.extend(parse_entries(entries, default_artist=artist, limit=120, source=source))
+        parsed = parse_entries(entries, default_artist=artist, limit=120, source=source)
+        for item in parsed:
+            if item.get('item_type') == 'collection':
+                item.update({
+                    'artist': artist,
+                    'album_artist': artist,
+                    'release_type': 'Playlist',
+                    'category': 'playlist',
+                    'collection_kind': 'playlist',
+                    'selected_by_default': True,
+                })
+            else:
+                item.update({
+                    'category': 'video' if source == 'videos' else 'song',
+                    'selected_by_default': False,
+                })
+        discovered.extend(parsed)
 
-    discovered = dedupe_items(discovered)
+    catalog = discover_ytmusic_artist_catalog(
+        artist_name=title or artist,
+        channel_id=channel_id,
+    )
+    catalog_items = catalog.get('items', []) if catalog.get('status') == 'ok' else []
+    if catalog.get('artist'):
+        artist = catalog['artist']
+        title = catalog['artist']
+
+    discovered = dedupe_items([*catalog_items, *discovered])
     return {
         'title': title or artist or 'Artist',
         'artist': artist or 'Unknown',
-        'items': discovered
+        'items': discovered,
+        'thumbnail': catalog.get('thumbnail', ''),
+        'artist_browse_id': catalog.get('artist_browse_id', ''),
     }
+
+
+def summarize_catalog(items):
+    breakdown = {
+        'album': 0,
+        'single': 0,
+        'ep': 0,
+        'playlist': 0,
+        'song': 0,
+        'video': 0,
+        'collection': 0,
+    }
+    for item in items:
+        category = (item.get('category') or '').strip().lower()
+        if not category:
+            category = 'collection' if item.get('item_type') == 'collection' else 'song'
+        breakdown[category] = breakdown.get(category, 0) + 1
+    return breakdown
 
 
 def expand_download_items(items):
@@ -1020,7 +1183,12 @@ def expand_download_items(items):
             info = extract_url_info(url, url_type='playlist', timeout=20)
             entries = info.get('entries') if info else []
             collection_title = (info or {}).get('title') or raw.get('title') or 'Collection'
-            collection_artist = (info or {}).get('uploader') or raw.get('artist') or 'Unknown'
+            collection_artist = (
+                raw.get('album_artist')
+                or raw.get('artist')
+                or (info or {}).get('uploader')
+                or 'Unknown'
+            )
             collection_cover = pick_best_thumbnail(info or {}) or raw.get('thumbnail') or ''
             collection_id = (parse_qs(urlparse(url).query).get('list') or [''])[0]
             collection_kind = 'official_album' if collection_id.startswith('OLAK5uy_') else 'playlist'
@@ -1034,8 +1202,8 @@ def expand_download_items(items):
                     'title': entry.get('title', f'Track {idx}'),
                     'artist': entry.get('artist', entry.get('uploader', collection_artist)),
                     'album': entry.get('album') or collection_title,
-                    'album_artist': entry.get('album_artist', collection_artist),
-                    'year': entry.get('release_year', ''),
+                    'album_artist': entry.get('album_artist') or raw.get('album_artist') or collection_artist,
+                    'year': entry.get('release_year') or raw.get('year', ''),
                     'track': entry.get('track_number', idx),
                     'track_total': entry.get('track_count', len(entries or [])),
                     'disc': entry.get('disc_number', ''),
@@ -1047,6 +1215,8 @@ def expand_download_items(items):
                     'collection_title': collection_title,
                     'collection_artist': collection_artist,
                     'collection_kind': collection_kind,
+                    'release_type': raw.get('release_type', ''),
+                    'category': raw.get('category', ''),
                     'url': song_url,
                     'item_type': 'song',
                 })
@@ -1068,6 +1238,8 @@ def expand_download_items(items):
                 'collection_title': raw.get('collection_title', ''),
                 'collection_artist': raw.get('collection_artist', ''),
                 'collection_kind': raw.get('collection_kind', ''),
+                'release_type': raw.get('release_type', ''),
+                'category': raw.get('category', ''),
                 'url': url,
                 'item_type': 'song',
             })
@@ -1093,23 +1265,10 @@ def extract_url_info(url, url_type=None, timeout=30):
             'file_access_retries': 3,
         }
 
-        parsed = urlparse(normalized_url)
-        player_clients = [x.strip() for x in str(config.get('youtube_player_client') or '').split(',') if x.strip()]
-        if not player_clients:
-            player_clients = ['default', 'web_music'] if 'music.youtube.com' in parsed.netloc.lower() else ['default']
-
-        if 'music.youtube.com' in parsed.netloc.lower():
-            ydl_opts['extractor_args'] = {
-                'youtube': {
-                    'player_client': player_clients
-                }
-            }
-        elif player_clients:
-            ydl_opts['extractor_args'] = {
-                'youtube': {
-                    'player_client': player_clients
-                }
-            }
+        extractor_args = youtube_extractor_args(config)
+        if extractor_args:
+            ydl_opts['extractor_args'] = extractor_args
+        ydl_opts.update(yt_dlp_runtime_options(config))
 
         browser = (config.get('cookies_from_browser') or '').strip().lower()
         profile = (config.get('cookies_profile') or '').strip()
@@ -1274,7 +1433,12 @@ def start_playlist_download(data, queue_id=None):
         'updated_at': datetime.now().isoformat(timespec='seconds'),
         'total_items': len(selected_items),
     }
-    if reuse_history_id and get_history_entry(reuse_history_id):
+    existing_history = get_history_entry(reuse_history_id) if reuse_history_id else None
+    if existing_history:
+        history_entry['created_at'] = existing_history.get('created_at') or history_entry['created_at']
+        history_entry['total_items'] = int(existing_history.get('total_items') or len(selected_items))
+        history_entry['retry_started_at'] = datetime.now().isoformat(timespec='seconds')
+        history_entry['retry_count'] = int(existing_history.get('retry_count') or 0) + 1
         update_history_entry(reuse_history_id, history_entry)
     else:
         add_history_entry(history_entry)
@@ -1424,6 +1588,9 @@ def get_config():
             config['filename_format'] = DEFAULT_CONFIG['filename_format']
         if not str(config.get('playlist_filename_format', '')).strip():
             config['playlist_filename_format'] = DEFAULT_CONFIG['playlist_filename_format']
+        config['youtube_player_client'] = normalize_player_client(config.get('youtube_player_client'))
+        if str(config.get('youtube_js_runtime', '')).strip().casefold() not in {'auto', 'deno', 'node', 'none'}:
+            config['youtube_js_runtime'] = DEFAULT_CONFIG['youtube_js_runtime']
         save_config(config)
         return jsonify({'status': 'ok', 'config': config})
     return jsonify(load_config())
@@ -1491,14 +1658,41 @@ def detect_url():
         url_lower = url.lower()
         is_music_browse = 'music.youtube.com' in url_lower and '/browse/' in urlparse(url).path
 
+        if is_music_browse:
+            browse_id = extract_browse_id(url) or ''
+            if browse_id.startswith('MPADUC'):
+                catalog = discover_ytmusic_artist_catalog(artist_browse_id=browse_id)
+                items = catalog.get('items', [])
+                if catalog.get('status') == 'ok' and items:
+                    breakdown = summarize_catalog(items)
+                    return jsonify({
+                        'type': 'artist',
+                        'catalog_scope': 'releases',
+                        'normalized_url': url,
+                        'title': catalog.get('artist', 'Artist'),
+                        'uploader': catalog.get('artist', 'Unknown'),
+                        'thumbnail': catalog.get('thumbnail', '') or items[0].get('thumbnail', ''),
+                        'total_videos': len(items),
+                        'videos': items,
+                        'collections': len(items),
+                        'songs': 0,
+                        'breakdown': breakdown,
+                        'recommended_selection': 'discography',
+                        'recommended_display': 'discography',
+                        'recommended_view': 'grouped',
+                        'source_message': 'Seccion oficial de albumes, singles y EPs de YouTube Music.',
+                    })
+
         info = extract_url_info(url, url_type=url_type, timeout=15)
         browse_fallback = None
         if is_music_browse and info is None:
             browse_fallback = resolve_music_browse_items(url)
             if browse_fallback:
                 items = browse_fallback.get('items', [])
+                breakdown = summarize_catalog(items)
                 return jsonify({
                     'type': 'artist',
+                    'catalog_scope': 'releases',
                     'normalized_url': url,
                     'title': browse_fallback.get('title', 'Artist'),
                     'uploader': browse_fallback.get('artist', 'Unknown'),
@@ -1507,6 +1701,11 @@ def detect_url():
                     'videos': items,
                     'collections': len([x for x in items if x.get('item_type') == 'collection']),
                     'songs': len([x for x in items if x.get('item_type') == 'song']),
+                    'breakdown': breakdown,
+                    'recommended_selection': 'discography',
+                    'recommended_display': 'discography',
+                    'recommended_view': 'grouped',
+                    'source_message': 'Seccion de lanzamientos detectada mediante el respaldo de YouTube Music.',
                 })
 
         if info is None:
@@ -1564,14 +1763,20 @@ def detect_url():
                         }
                 return jsonify({
                     'type': 'artist',
+                    'catalog_scope': 'discography',
                     'normalized_url': url,
                     'title': artist_data.get('title', 'Artist'),
                     'uploader': artist_data.get('artist', 'Unknown'),
-                    'thumbnail': (items[0].get('thumbnail') if items else ''),
+                    'thumbnail': artist_data.get('thumbnail') or (items[0].get('thumbnail') if items else ''),
                     'total_videos': len(items),
                     'videos': items,
                     'collections': len([x for x in items if x.get('item_type') == 'collection']),
                     'songs': len([x for x in items if x.get('item_type') == 'song']),
+                    'breakdown': summarize_catalog(items),
+                    'recommended_selection': 'discography',
+                    'recommended_display': 'discography',
+                    'recommended_view': 'grouped',
+                    'source_message': 'Discografia oficial, playlists y contenido del canal. Los videos quedan visibles pero no seleccionados por defecto.',
                 })
 
             videos = parse_entries(
@@ -1743,6 +1948,7 @@ def playlist_download_worker(
                 'playlist_total': total,
                 'playlist_cover_url': video.get('playlist_cover_url') or playlist_cover,
                 'collection_kind': item_collection_kind,
+                'release_type': video.get('release_type', ''),
                 'compilation': item_collection_kind == 'playlist' and mixed_artists,
                 'is_playlist_item': True,
             }
@@ -1793,7 +1999,10 @@ def playlist_download_worker(
                 DOWNLOAD_QUEUE[queue_id]['message'] = f'Reintentando item {idx}/{total} ({attempt}/{max_item_attempts})...'
             else:
                 DOWNLOAD_QUEUE[queue_id]['message'] = f'Descargando {idx}/{total}...'
-            DOWNLOAD_QUEUE[queue_id]['progress'] = int((idx / total) * 100)
+            DOWNLOAD_QUEUE[queue_id]['progress'] = max(
+                int(DOWNLOAD_QUEUE[queue_id].get('progress') or 0),
+                int((idx / total) * 100),
+            )
             update_history_entry(DOWNLOAD_QUEUE[queue_id].get('history_id'), {
                 'status': 'descargando',
                 'progress': DOWNLOAD_QUEUE[queue_id]['progress'],
@@ -1878,6 +2087,7 @@ def build_output_paths(metadata, config):
         config,
         is_playlist_item,
         collection_kind=metadata.get('collection_kind', ''),
+        release_type=metadata.get('release_type', ''),
     )
     folder_structure = safe_format(
         folder_template,
@@ -1939,8 +2149,21 @@ def relocate_downloaded_family(media_path, metadata, config):
     return destination, destination_folder, destination_stem
 
 
-def resolve_folder_template(config, is_playlist_item=False, *, collection_kind=''):
+def resolve_folder_template(config, is_playlist_item=False, *, collection_kind='', release_type=''):
     base_template = (config.get('folder_structure') or '').strip() or '{artist}/{year} - {album}'
+    normalized_release_type = str(release_type or '').strip().casefold()
+    if normalized_release_type in {'single', 'sencillo'}:
+        mode = (config.get('single_folder_mode') or 'by_artist').strip().lower()
+        custom_template = (config.get('single_folder_template') or '').strip()
+        single_presets = {
+            'per_release': base_template,
+            'by_artist': '{album_artist}/Singles',
+            'by_artist_year': '{album_artist}/Singles/{year}',
+        }
+        if mode == 'custom':
+            return custom_template or '{album_artist}/Singles'
+        return single_presets.get(mode, single_presets['by_artist'])
+
     if not is_playlist_item:
         return base_template
 
@@ -2200,10 +2423,6 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
         max_sleep_interval = int(config.get('max_sleep_interval', 0))
         archive_file = Path(config.get('archive_file') or (Path.home() / '.ymd_download_archive.txt'))
         force_redownload = bool(config.get('force_redownload'))
-        player_clients = [x.strip() for x in str(config.get('youtube_player_client') or '').split(',') if x.strip()]
-        if not player_clients:
-            player_clients = ['default', 'web_music'] if 'music.youtube.com' in url.lower() else ['default']
-
         ydl_opts = {
             # El thumbnail de video suele ser 16:9 y puede traer relleno a los
             # lados. El cover musical se resuelve y normaliza despues.
@@ -2214,14 +2433,16 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
             'retries': retry_count,
             'fragment_retries': fragment_retries,
             'file_access_retries': 3,
+            'socket_timeout': 30,
             'concurrent_fragment_downloads': concurrent_fragments,
+            'logger': QuietYTDLPLogger(),
             'progress_hooks': [lambda d: update_progress(queue_id, d, is_playlist, current, total)],
-            'extractor_args': {
-                'youtube': {
-                    'player_client': player_clients
-                }
-            },
         }
+
+        extractor_args = youtube_extractor_args(config)
+        if extractor_args:
+            ydl_opts['extractor_args'] = extractor_args
+        ydl_opts.update(yt_dlp_runtime_options(config))
 
         if sleep_interval > 0:
             ydl_opts['sleep_interval'] = sleep_interval
@@ -2415,9 +2636,13 @@ def download_worker(queue_id, url, metadata, config, is_playlist=False, current=
                 media_files = DOWNLOAD_QUEUE[queue_id].setdefault('media_files', [])
                 if media_file not in media_files:
                     media_files.append(media_file)
+                destination_root = common_media_root(media_files)
+                if destination_root:
+                    DOWNLOAD_QUEUE[queue_id]['destination_root'] = destination_root
                 update_history_entry(DOWNLOAD_QUEUE[queue_id].get('history_id'), {
                     'last_media_file': media_file,
-                    'media_files': media_files[-100:],
+                    'media_files': media_files[-2000:],
+                    'destination_root': destination_root,
                 })
 
         if not is_playlist:
@@ -2474,7 +2699,10 @@ def update_progress(queue_id, d, is_playlist=False, current=0, total=0):
                 overall_progress = int(((current - 1 + progress / 100) / total) * 100)
                 if DOWNLOAD_QUEUE[queue_id].get('status') != 'pausado':
                     DOWNLOAD_QUEUE[queue_id]['status'] = 'descargando'
-                    DOWNLOAD_QUEUE[queue_id]['progress'] = overall_progress
+                    DOWNLOAD_QUEUE[queue_id]['progress'] = max(
+                        int(DOWNLOAD_QUEUE[queue_id].get('progress') or 0),
+                        overall_progress,
+                    )
                     DOWNLOAD_QUEUE[queue_id]['message'] = f'Descargando {current}/{total}...'
             else:
                 if DOWNLOAD_QUEUE[queue_id].get('status') != 'pausado':
@@ -2491,8 +2719,21 @@ def update_progress(queue_id, d, is_playlist=False, current=0, total=0):
                     'speed': speed,
                     'eta': str(eta) if eta is not None else '',
                 })
-        except Exception:
-            pass
+        except Exception as exc:
+            LOGGER.debug("No se pudo actualizar el progreso de la cola %s: %s", queue_id, exc)
+    elif d.get('status') == 'finished' and queue_id in DOWNLOAD_QUEUE:
+        queue = DOWNLOAD_QUEUE[queue_id]
+        queue['speed'] = ''
+        queue['eta'] = ''
+        queue['phase'] = 'procesando'
+        queue['message'] = 'Transferencia finalizada; procesando metadatos y portada...'
+        update_history_entry(queue.get('history_id'), {
+            'status': queue.get('status', 'descargando'),
+            'speed': '',
+            'eta': '',
+            'phase': 'procesando',
+            'message': queue['message'],
+        })
 
 
 def apply_metadata(file_path, metadata):
@@ -2615,6 +2856,19 @@ def get_status(queue_id):
     return jsonify({'error': 'No encontrado'}), 404
 
 
+@app.route('/api/health')
+def health_check():
+    return jsonify({
+        'service': 'ymd',
+        'version': VERSION,
+        'started_at': APP_STARTED_AT.isoformat(timespec='seconds'),
+        'active_downloads': sum(
+            1 for queue in DOWNLOAD_QUEUE.values()
+            if is_active_queue_status(queue.get('status'))
+        ),
+    })
+
+
 @app.route('/api/queue')
 def get_queue():
     items = sorted(
@@ -2735,7 +2989,7 @@ def control_queue(queue_id):
 @app.route('/api/history')
 def get_history():
     items = sorted(
-        load_history(),
+        reconcile_orphaned_history(),
         key=lambda x: (x.get('updated_at') or x.get('created_at') or ''),
         reverse=True
     )
@@ -2764,13 +3018,27 @@ def validate_history_item(history_id):
 
     destination = Path((item.get('destination') or '')).expanduser()
     payload = item.get('request_payload') or {}
-    expected = 1
-    if item.get('kind') == 'playlist':
-        expected = len(payload.get('selected_items') or payload.get('videos') or []) or int(item.get('downloaded') or 0) or 1
+    expected = int(item.get('total_items') or 0)
+    if expected <= 0 and item.get('kind') == 'playlist':
+        expected = len(payload.get('selected_items') or payload.get('videos') or [])
+    expected = expected or 1
 
-    media_count = count_media_files(destination) if destination.exists() else 0
+    media_exts = {'.mp3', '.m4a', '.wav', '.flac', '.ogg', '.opus', '.mp4', '.mkv', '.webm'}
+    recorded_files = set()
+    for raw_path in item.get('media_files') or []:
+        try:
+            media_path = Path(raw_path).expanduser().resolve()
+            if media_path.is_file() and media_path.suffix.lower() in media_exts:
+                recorded_files.add(str(media_path))
+        except (OSError, TypeError, ValueError):
+            continue
+    folder_media_count = count_media_files(destination) if destination.exists() else 0
+    # Para discografias, ``destination`` puede ser la raiz general mientras se
+    # analiza o la carpeta del ultimo album. Si existen rutas registradas son
+    # la fuente autoritativa y evitan contar musica de otras tareas.
+    media_count = len(recorded_files) if recorded_files else folder_media_count
     missing = max(0, expected - media_count)
-    looks_ok = destination.exists() and media_count >= max(1, min(expected, 1 if item.get('kind') == 'single' else expected))
+    looks_ok = media_count >= expected
 
     return jsonify({
         'history_id': history_id,
@@ -2779,6 +3047,8 @@ def validate_history_item(history_id):
         'kind': item.get('kind') or 'single',
         'expected_items': expected,
         'media_files_found': media_count,
+        'recorded_files_found': len(recorded_files),
+        'destination_files_found': folder_media_count,
         'missing_items': missing,
         'looks_complete': bool(looks_ok),
         'suggestion': ('Reintentar con "Forzar redescarga" para recuperar faltantes.' if (not looks_ok or missing > 0) else 'Sin faltantes evidentes en la carpeta destino.')
@@ -2786,9 +3056,8 @@ def validate_history_item(history_id):
 
 
 def has_active_downloads():
-    active_states = {'iniciando', 'analizando', 'descargando', 'pausado'}
     for queue in DOWNLOAD_QUEUE.values():
-        if queue.get('status') in active_states:
+        if queue.get('status') in ACTIVE_DOWNLOAD_STATES:
             return True
     return any(
         item.get('status') in {'pending', 'starting', 'running'}

@@ -20,7 +20,7 @@ if /I "%~2"=="debug" set "DEBUG_FLAG=--debug"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
 
 echo ==========================================
-echo   YT-Descargar 0.012 - Launcher
+echo   YT-Descargar 0.013 - Launcher
 echo ==========================================
 echo [INFO] Carpeta: %ROOT%
 echo [INFO] Log de inicio: %APP_LOG%
@@ -33,6 +33,11 @@ call :install_deps || goto :fatal
 call :verify_imports || goto :fatal
 call :ensure_ffmpeg || goto :fatal
 call :choose_free_port || goto :fatal
+if defined APP_ALREADY_RUNNING (
+    echo [INFO] YT-Descargar ya esta abierto en http://%APP_HOST%:%APP_PORT%
+    echo [INFO] No se iniciara una segunda instancia que comparta el historial.
+    exit /b 0
+)
 
 echo.
 echo [OK] Todo listo.
@@ -83,10 +88,10 @@ echo [OK] Python detectado: %PY_EXE%
 exit /b 0
 
 :check_python_version
-echo [CHECK] Validando version de Python (3.10+)...
-%PY_EXE% -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)" >nul 2>&1
+echo [CHECK] Validando version de Python (3.11+)...
+%PY_EXE% -c "import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Esta app requiere Python 3.10 o superior.
+    echo [ERROR] Esta app requiere Python 3.11 o superior.
     %PY_EXE% --version
     exit /b 1
 )
@@ -125,9 +130,9 @@ exit /b 0
 echo [CHECK] Instalando/actualizando dependencias...
 python -m pip install --disable-pip-version-check -q --upgrade pip setuptools wheel
 if exist "requirements.txt" (
-    python -m pip install --disable-pip-version-check -q -r requirements.txt
+    python -m pip install --disable-pip-version-check -q --upgrade --upgrade-strategy only-if-needed -r requirements.txt
 ) else (
-    python -m pip install --disable-pip-version-check -q flask flask-cors yt-dlp mutagen musicbrainzngs pillow requests
+    python -m pip install --disable-pip-version-check -q --upgrade flask flask-cors "yt-dlp[default,curl-cffi,deno]" mutagen musicbrainzngs pillow requests
 )
 if errorlevel 1 (
     echo [ERROR] Fallo al instalar dependencias.
@@ -158,6 +163,13 @@ if errorlevel 1 (
 exit /b 0
 
 :choose_free_port
+echo [CHECK] Comprobando si la aplicacion ya esta activa...
+powershell -NoProfile -Command "$ProgressPreference='SilentlyContinue'; try { $health=Invoke-RestMethod -Uri 'http://%APP_HOST%:%APP_PORT%/api/health' -TimeoutSec 2; if ($health.service -eq 'ymd') { exit 0 } } catch {}; try { $response=Invoke-WebRequest -UseBasicParsing -Uri 'http://%APP_HOST%:%APP_PORT%/api/history' -TimeoutSec 2; if ($response.StatusCode -eq 200) { exit 0 } } catch {}; exit 1" >nul 2>&1
+if not errorlevel 1 (
+    set "APP_ALREADY_RUNNING=1"
+    exit /b 0
+)
+
 echo [CHECK] Buscando puerto libre (inicio en %APP_PORT%)...
 for /f %%p in ('powershell -NoProfile -Command "$start=[int]'%APP_PORT%'; for($p=$start; $p -le 65535; $p++){ try { $l=[System.Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$p); $l.Start(); $l.Stop(); Write-Output $p; break } catch {} }"') do set "FREE_PORT=%%p"
 

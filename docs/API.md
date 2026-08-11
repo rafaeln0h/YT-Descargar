@@ -2,7 +2,7 @@
 
 Base predeterminada: `http://127.0.0.1:5000`.
 
-La API de v0.012 no implementa autenticación y sólo debe exponerse en loopback.
+La API de v0.013 no implementa autenticación y sólo debe exponerse en loopback.
 No publiques el puerto en Internet.
 
 ## Cola persistente
@@ -37,6 +37,11 @@ del archivo anti-duplicados y ruta de logs.
 Contrato de descubrimiento para futuros clientes. Devuelve funciones, formatos,
 contenedores etiquetables, fuentes de metadata y plataformas actuales/planeadas.
 Los clientes deben probar capacidades; no inferirlas sólo por versión.
+
+El objeto `runtime` incluye el estado y las versiones de Python, yt-dlp,
+`yt-dlp-ejs`, `curl-cffi`, Deno/Node, FFmpeg/ffprobe, el cliente de YouTube y
+proveedores opcionales de PO Token. Las rutas se muestran porque la API es local
+y sirven para diagnosticar entornos virtuales o instalaciones duplicadas.
 
 ### `GET /api/system/update`
 

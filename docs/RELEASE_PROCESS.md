@@ -7,7 +7,7 @@ El proyecto usa una secuencia decimal de producto:
 `0.012 → 0.013 → 0.014 → 0.015 → 0.016`
 
 No se interpreta como SemVer estricto. La etiqueta Git siempre añade `v`, por
-ejemplo `v0.012`. La versión vive en `ymd/version.py` y `pyproject.toml`.
+ejemplo `v0.013`. La versión vive en `ymd/version.py` y `pyproject.toml`.
 
 ## Lista de control
 
@@ -24,9 +24,12 @@ ejemplo `v0.012`. La versión vive en `ymd/version.py` y `pyproject.toml`.
 
 ## Artefactos
 
-v0.012 se publica como código fuente. No se debe adjuntar `ffmpeg.exe` sin
-proceso explícito de licencias, procedencia y checksums. Los instaladores
-firmados son un objetivo posterior.
+Cada tag publica un ZIP versionado generado con `git archive` y un archivo
+`SHA256SUMS.txt`, además de los archivos fuente automáticos de GitHub. El ZIP no
+incluye `.git`, entornos virtuales, configuración, historial, logs ni descargas.
+
+No se debe adjuntar `ffmpeg.exe` sin proceso explícito de licencias, procedencia
+y checksums. Los instaladores firmados son un objetivo posterior.
 
 ## Reversión
 
@@ -35,4 +38,3 @@ No se mueve ni reemplaza un tag publicado. Ante un error:
 - marcar la release con advertencia;
 - corregir en la siguiente versión;
 - retirar sólo artefactos inseguros conservando explicación y trazabilidad.
-

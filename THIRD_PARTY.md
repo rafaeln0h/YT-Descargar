@@ -8,11 +8,15 @@ Dependencias principales:
 
 - Flask y Flask-CORS
 - yt-dlp
+- yt-dlp-ejs
+- Deno
+- curl-cffi
 - FFmpeg/ffprobe (externos)
 - Mutagen
 - musicbrainzngs
 - Pillow
 - Requests
+- ytmusicapi
 
 Servicios opcionales consultados durante la ejecución:
 
@@ -24,4 +28,3 @@ Servicios opcionales consultados durante la ejecución:
 Consulta [docs/SOURCES.md](docs/SOURCES.md). Antes de publicar instaladores se
 debe generar un SBOM, agrupar avisos/licencias aplicables y documentar el origen
 y checksum de FFmpeg.
-

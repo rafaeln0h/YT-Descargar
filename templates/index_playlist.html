@@ -951,6 +951,7 @@
         .status-chip.completado { background: #def7e5; color: #17663a; }
         .status-chip.error { background: #ffe1e1; color: #9d1f1f; }
         .status-chip.cancelado { background: #f6e3e3; color: #8f2d2d; }
+        .status-chip.interrumpido { background: #fff0d6; color: #8a4b08; }
         .status-chip.pausado { background: #ede7ff; color: #5b33a3; }
         .status-chip.iniciando,
         .status-chip.analizando,
@@ -1021,7 +1022,7 @@
 
         <nav class="ymd-primary-tabs" data-ymd-tablist="main" aria-label="Secciones principales">
             <button class="is-active" type="button" data-ymd-tab="download" aria-selected="true">Explorar y descargar</button>
-            <button type="button" data-ymd-tab="activity" aria-selected="false">Descargas</button>
+            <button type="button" data-ymd-tab="activity" aria-selected="false">Descargas <span class="activity-tab-badge" id="downloadTabBadge" hidden>0</span></button>
             <button type="button" data-ymd-tab="library" aria-selected="false">Biblioteca</button>
             <a href="/settings">Configuración</a>
         </nav>
@@ -1130,16 +1131,27 @@
                 <div id="urlInfo" class="hidden" style="margin-top: 15px;">
                     <div id="urlBadge" class="badge"></div>
                     <div id="typeInfo" class="info-box"></div>
+                    <div id="catalogSummary" class="catalog-summary hidden" aria-label="Resumen del contenido detectado"></div>
                     <div id="detectedPreview" class="hidden"></div>
+
+                    <aside id="downloadReminder" class="download-reminder hidden" role="status" aria-live="polite">
+                        <div>
+                            <strong id="downloadReminderTitle">Revisa tu selección</strong>
+                            <span id="downloadReminderText"></span>
+                        </div>
+                        <button class="btn btn-primary" type="button" id="downloadReminderAction" onclick="focusDownloadAction()">Continuar</button>
+                    </aside>
 
                     <div id="videoListSection" class="hidden">
                         <div class="form-label">Contenido a descargar</div>
                         <div class="toolbar">
-                            <button class="btn btn-secondary btn-filter" data-filter="all" onclick="applySelectionFilter('all')">Seleccionar todo</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="discography" onclick="applySelectionFilter('discography')">Discografía completa</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="album" onclick="applySelectionFilter('album')">Álbumes</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="single" onclick="applySelectionFilter('single')">Singles</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="ep" onclick="applySelectionFilter('ep')">EPs</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="playlist" onclick="applySelectionFilter('playlist')">Playlists</button>
+                            <button class="btn btn-secondary btn-filter" data-filter="song" onclick="applySelectionFilter('song')">Canciones/videos</button>
                             <button class="btn btn-secondary" onclick="selectAllItems(false)">Limpiar seleccion</button>
-                            <button class="btn btn-secondary btn-filter" data-filter="collection" onclick="applySelectionFilter('collection')">Solo albums/colecciones</button>
-                            <button class="btn btn-secondary btn-filter" data-filter="song" onclick="applySelectionFilter('song')">Solo canciones</button>
-                            <button class="btn btn-secondary" onclick="selectCompleteAlbums()">Seleccionar albums completos</button>
                         </div>
                         <div class="toolbar view-controls">
                             <button class="chip-btn" data-view="list" onclick="setViewMode('list')">Vista lista</button>
@@ -1147,8 +1159,12 @@
                             <button class="chip-btn" data-view="grid" onclick="setViewMode('grid')">Vista cuadrícula</button>
                             <select id="displayFilter" class="form-select" style="max-width: 230px;" onchange="setDisplayFilter(this.value)">
                                 <option value="all">Mostrar: Todo</option>
-                                <option value="collection">Mostrar: Solo albumes/colecciones</option>
-                                <option value="song">Mostrar: Solo canciones</option>
+                                <option value="discography">Mostrar: Discografía</option>
+                                <option value="album">Mostrar: Álbumes</option>
+                                <option value="single">Mostrar: Singles</option>
+                                <option value="ep">Mostrar: EPs</option>
+                                <option value="playlist">Mostrar: Playlists</option>
+                                <option value="song">Mostrar: Canciones/videos</option>
                             </select>
                         </div>
                         <div class="toolbar dynamic-toolbar">
@@ -1243,6 +1259,21 @@
                     </div>
 
                     <div id="playlistFolderSection" class="hidden">
+                        <div class="form-group">
+                            <label class="form-label">Organizacion de sencillos</label>
+                            <select id="singleFolderMode" class="form-select">
+                                <option value="by_artist">Una carpeta Singles por artista</option>
+                                <option value="by_artist_year">Singles por artista y ano</option>
+                                <option value="per_release">Una carpeta por lanzamiento</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                            <small class="muted">Solo se aplica a lanzamientos identificados como Single o Sencillo; no mezcla albumes ni EP.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Plantilla personalizada para sencillos</label>
+                            <input type="text" id="singleFolderTemplate" class="form-input" placeholder="Ej: {album_artist}/Singles/{year}">
+                            <small class="muted">Variables: {artist}, {album_artist}, {album}, {year}</small>
+                        </div>
                         <div class="form-group">
                             <label class="form-label">Organizacion de playlists</label>
                             <select id="playlistFolderMode" class="form-select">
@@ -1429,6 +1460,7 @@
         let currentUrlType = null;
         let currentVideos = [];
         let currentDetected = null;
+        let itemSelectionState = new Map();
         let viewMode = 'list';
         let displayFilter = 'all';
         let currentSelectionFilter = 'all';
@@ -1451,6 +1483,8 @@
             video_format: 'mp4',
             video_quality: '1080',
             folder_structure: '{album_artist}/{year} - {album}',
+            single_folder_mode: 'by_artist',
+            single_folder_template: '',
             playlist_folder_mode: 'smart',
             playlist_folder_template: '',
             filename_format: '{track:02d} {title}',
@@ -1493,6 +1527,7 @@
                 completado: 'completado',
                 error: 'error',
                 cancelado: 'cancelado',
+                interrumpido: 'interrumpido',
                 paused: 'pausado',
                 pausado: 'pausado',
                 iniciando: 'iniciando',
@@ -1596,8 +1631,17 @@
         }
 
         function syncPlaylistFolderControls() {
+            const singleModeSelect = document.getElementById('singleFolderMode');
+            const singleTemplateInput = document.getElementById('singleFolderTemplate');
             const modeSelect = document.getElementById('playlistFolderMode');
             const templateInput = document.getElementById('playlistFolderTemplate');
+            if (singleModeSelect) {
+                singleModeSelect.value = runtimeConfig.single_folder_mode || 'by_artist';
+            }
+            if (singleTemplateInput) {
+                singleTemplateInput.value = runtimeConfig.single_folder_template || '';
+                singleTemplateInput.disabled = (runtimeConfig.single_folder_mode || 'by_artist') !== 'custom';
+            }
             if (modeSelect) {
                 modeSelect.value = runtimeConfig.playlist_folder_mode || 'inherit';
             }
@@ -1890,6 +1934,7 @@
             currentUrlType = null;
             currentVideos = [];
             currentDetected = null;
+            itemSelectionState = new Map();
             markUrlState('');
             updateUrlPreview('');
             document.getElementById('urlInfo').classList.add('hidden');
@@ -1899,12 +1944,121 @@
             document.getElementById('downloadBtn').disabled = true;
             document.getElementById('queueBtn').disabled = true;
             renderDetectedPreview(null);
+            renderCatalogSummary(null);
+            setDownloadReminder('hidden');
             addLog('[OK] URL limpiada');
+        }
+
+        function handleSingleFolderModeChange() {
+            const value = document.getElementById('singleFolderMode')?.value || 'by_artist';
+            runtimeConfig.single_folder_mode = value;
+            syncPlaylistFolderControls();
+            persistConfigPatch({ single_folder_mode: runtimeConfig.single_folder_mode });
+        }
+
+        function handleSingleFolderTemplateChange() {
+            const value = document.getElementById('singleFolderTemplate')?.value || '';
+            runtimeConfig.single_folder_template = value;
+            persistConfigPatch({ single_folder_template: runtimeConfig.single_folder_template });
+        }
+
+        function renderCatalogSummary(data) {
+            const container = document.getElementById('catalogSummary');
+            if (!container) return;
+            const breakdown = data?.breakdown || {};
+            const categories = ['album', 'single', 'ep', 'playlist', 'song', 'video'];
+            const available = categories.filter((category) => Number(breakdown[category] || 0) > 0);
+            if (!available.length) {
+                container.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = available.map((category) => `
+                <button type="button" class="catalog-stat" onclick="setDisplayFilter('${category}')">
+                    <strong>${Number(breakdown[category] || 0)}</strong>
+                    <span>${escapeHtml(categoryLabel(category, true))}</span>
+                </button>
+            `).join('');
+            container.classList.remove('hidden');
+        }
+
+        function setDownloadReminder(state, message = '') {
+            const reminder = document.getElementById('downloadReminder');
+            const title = document.getElementById('downloadReminderTitle');
+            const copy = document.getElementById('downloadReminderText');
+            const action = document.getElementById('downloadReminderAction');
+            if (!reminder || state === 'hidden') {
+                reminder?.classList.add('hidden');
+                return;
+            }
+            const content = {
+                ready: ['Listo para descargar', message || 'Revisa la selección y pulsa Descargar ahora o Agregar a cola.', 'Revisar descarga'],
+                pending: ['Pendiente de iniciar', message || 'La tarea está guardada. Abre Descargas y pulsa Iniciar cola.', 'Ir a Descargas'],
+                started: ['Descarga en curso', message || 'Puedes cambiar de pestaña: el progreso seguirá visible en Descargas.', 'Ver progreso'],
+                completed: ['Descarga completada', message || 'Todo el contenido seleccionado terminó.', 'Ver Descargas'],
+                error: ['Requiere atención', message || 'La descarga encontró un error. Revisa Descargas para reintentar.', 'Revisar error']
+            }[state] || ['Estado de descarga', message, 'Continuar'];
+            reminder.dataset.state = state;
+            title.textContent = content[0];
+            copy.textContent = content[1];
+            action.textContent = content[2];
+            reminder.classList.remove('hidden');
+        }
+
+        function focusDownloadAction() {
+            const state = document.getElementById('downloadReminder')?.dataset.state;
+            if (['pending', 'started', 'completed', 'error'].includes(state)) {
+                document.querySelector('[data-ymd-tab="activity"]')?.click();
+                document.getElementById('progressSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                return;
+            }
+            document.getElementById('downloadBtn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            document.getElementById('downloadBtn')?.focus();
+        }
+
+        function itemCategory(item) {
+            if (!item) return 'song';
+            const explicit = (item.category || '').toString().toLowerCase();
+            if (explicit) return explicit;
+            if ((item.item_type || 'song') !== 'collection') {
+                return item.source === 'videos' ? 'video' : 'song';
+            }
+            const type = normalizeText(item.release_type || '');
+            if (type === 'album') return 'album';
+            if (type === 'ep') return 'ep';
+            if (type === 'single' || type === 'sencillo') return 'single';
+            if (type === 'playlist') return 'playlist';
+            return 'collection';
+        }
+
+        function categoryLabel(category, plural = false) {
+            const labels = {
+                album: plural ? 'Álbumes' : 'Álbum',
+                single: plural ? 'Singles' : 'Single',
+                ep: plural ? 'EPs' : 'EP',
+                playlist: plural ? 'Playlists' : 'Playlist',
+                video: plural ? 'Videos del canal' : 'Video',
+                song: plural ? 'Canciones' : 'Canción',
+                collection: plural ? 'Otras colecciones' : 'Colección'
+            };
+            return labels[category] || labels.collection;
+        }
+
+        function isDiscographyItem(item) {
+            return ['album', 'single', 'ep', 'playlist', 'collection'].includes(itemCategory(item));
+        }
+
+        function itemMatchesFilter(item, filter) {
+            if (filter === 'all') return true;
+            if (filter === 'discography' || filter === 'collection') return isDiscographyItem(item);
+            if (filter === 'song') return ['song', 'video'].includes(itemCategory(item));
+            return itemCategory(item) === filter;
         }
 
         function groupKeyForItem(item) {
             if (!item) return 'Sin grupo';
-            if (item.item_type === 'collection') return item.artist || 'Colecciones';
+            if (item.item_type === 'collection') return categoryLabel(itemCategory(item), true);
+            if (itemCategory(item) === 'video') return categoryLabel('video', true);
             return item.album || item.artist || 'Sin album';
         }
 
@@ -1921,11 +2075,7 @@
         function getVisibleEntries(videos) {
             const all = videos.map((item, idx) => ({ item, idx }));
             let out = all;
-            if (displayFilter === 'collection') {
-                out = out.filter(({ item }) => (item.item_type || 'song') === 'collection');
-            } else if (displayFilter === 'song') {
-                out = out.filter(({ item }) => (item.item_type || 'song') === 'song');
-            }
+            out = out.filter(({ item }) => itemMatchesFilter(item, displayFilter));
             const term = normalizeText(currentSearchTerm);
             if (!term) return out;
             return out.filter(({ item }) => {
@@ -1935,9 +2085,10 @@
         }
 
         function getSelectionMap() {
-            const map = {};
+            const map = Object.fromEntries(itemSelectionState.entries());
             document.querySelectorAll('.video-check').forEach((chk) => {
                 map[chk.dataset.idx] = chk.checked;
+                itemSelectionState.set(Number(chk.dataset.idx), chk.checked);
             });
             return map;
         }
@@ -1947,19 +2098,18 @@
             const container = document.getElementById('videoList');
             const visibleEntries = getVisibleEntries(videos);
             const itemHtml = (v, idx, groupName) => {
-                const itemType = v.item_type || 'song';
-                const badge = itemType === 'collection'
-                    ? '<span class="item-badge collection">ALBUM/COLLECTION</span>'
-                    : '<span class="item-badge">SONG</span>';
-                const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : true;
+                const category = itemCategory(v);
+                const badge = `<span class="item-badge ${v.item_type === 'collection' ? 'collection' : ''}">${escapeHtml(categoryLabel(category))}</span>`;
+                const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : v.selected_by_default !== false;
                 const groupKey = encodeURIComponent(groupName || 'Sin grupo');
+                const detail = [v.artist || 'Unknown', v.year || '', v.album && v.album !== v.title ? v.album : ''].filter(Boolean).join(' · ');
                 return `
                     <div class="video-item">
                         <input type="checkbox" class="video-check" data-idx="${idx}" data-group="${groupKey}" ${checked ? 'checked' : ''}>
                         ${renderThumb(v.thumbnail || '', v.title || 'Preview')}
                         <div>
-                            <div class="video-title">${idx + 1}. ${v.title || 'Sin titulo'}</div>
-                            <div class="video-artist">${v.artist || 'Unknown'}</div>
+                            <div class="video-title">${idx + 1}. ${escapeHtml(v.title || 'Sin titulo')}</div>
+                            <div class="video-artist">${escapeHtml(detail)}</div>
                         </div>
                         <div>${badge}</div>
                     </div>
@@ -2000,11 +2150,9 @@
             } else if (viewMode === 'grid') {
                 container.innerHTML = `<div class="video-grid">${
                     visibleEntries.map(({ item, idx }) => {
-                        const itemType = item.item_type || 'song';
-                        const badge = itemType === 'collection'
-                            ? '<span class="item-badge collection">ALBUM/COLLECTION</span>'
-                            : '<span class="item-badge">SONG</span>';
-                        const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : true;
+                        const category = itemCategory(item);
+                        const badge = `<span class="item-badge ${item.item_type === 'collection' ? 'collection' : ''}">${escapeHtml(categoryLabel(category))}</span>`;
+                        const checked = selectedMap.hasOwnProperty(String(idx)) ? selectedMap[String(idx)] : item.selected_by_default !== false;
                         const groupName = groupKeyForItem(item);
                         const groupKey = encodeURIComponent(groupName || 'Sin grupo');
                         return `
@@ -2012,8 +2160,8 @@
                                 <input type="checkbox" class="video-check" data-idx="${idx}" data-group="${groupKey}" ${checked ? 'checked' : ''}>
                                 ${renderThumb(item.thumbnail || '', item.title || 'Preview')}
                                 <div>
-                                    <div class="video-title">${idx + 1}. ${item.title || 'Sin titulo'}</div>
-                                    <div class="video-artist">${item.artist || 'Unknown'}</div>
+                                    <div class="video-title">${idx + 1}. ${escapeHtml(item.title || 'Sin titulo')}</div>
+                                    <div class="video-artist">${escapeHtml([item.artist || 'Unknown', item.year || ''].filter(Boolean).join(' · '))}</div>
                                     <div class="meta-row">
                                         ${badge}
                                         <span class="muted">${groupName}</span>
@@ -2047,15 +2195,8 @@
         }
 
         function getSelectedItems() {
-            const checks = document.querySelectorAll('.video-check');
-            const out = [];
-            checks.forEach((chk) => {
-                if (chk.checked) {
-                    const idx = Number(chk.dataset.idx);
-                    if (currentVideos[idx]) out.push(currentVideos[idx]);
-                }
-            });
-            return out;
+            getSelectionMap();
+            return currentVideos.filter((_item, idx) => itemSelectionState.get(idx) === true);
         }
 
         function buildDownloadData() {
@@ -2090,6 +2231,8 @@
                 video_format: runtimeConfig.video_format,
                 video_quality: runtimeConfig.video_quality,
                 folder_structure: runtimeConfig.folder_structure,
+                single_folder_mode: runtimeConfig.single_folder_mode || 'by_artist',
+                single_folder_template: runtimeConfig.single_folder_template || '',
                 playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
                 playlist_folder_template: runtimeConfig.playlist_folder_template || '',
                 filename_format: runtimeConfig.filename_format,
@@ -2173,6 +2316,16 @@
             }
         }
 
+        window.addEventListener('ymd:pending-queue-reconciled', (event) => {
+            const jobs = event.detail?.jobs;
+            if (!Array.isArray(jobs)) return;
+            pendingDownloadQueue = jobs;
+            if (event.detail?.removed) {
+                addLog(`[OK] Se retiraron ${event.detail.removed} tarea(s) locales que el backend ya habia completado o recibido.`);
+            }
+            renderQueueList();
+        });
+
         function isQueueActiveStatus(status) {
             return ['pending', 'processing', 'paused', 'iniciando', 'analizando', 'descargando', 'pausado'].includes((status || '').toLowerCase());
         }
@@ -2232,6 +2385,8 @@
                 video_format: runtimeConfig.video_format,
                 video_quality: runtimeConfig.video_quality,
                 folder_structure: runtimeConfig.folder_structure,
+                single_folder_mode: runtimeConfig.single_folder_mode || 'by_artist',
+                single_folder_template: runtimeConfig.single_folder_template || '',
                 playlist_folder_mode: runtimeConfig.playlist_folder_mode || 'inherit',
                 playlist_folder_template: runtimeConfig.playlist_folder_template || '',
                 filename_format: runtimeConfig.filename_format,
@@ -2251,6 +2406,7 @@
 
             const job = {
                 uiId: `job_${Date.now()}_${queueUiSeq}`,
+                createdAt: Date.now(),
                 type: isSingle ? 'single' : 'playlist',
                 label: detected.title || payload.album || 'Descarga',
                 payload,
@@ -2489,13 +2645,23 @@
             box.innerHTML = historyItems.map((item) => {
                 const statusClass = formatStatusLabel(item.status);
                 const subtitle = item.artist ? `${item.artist} | ${item.mode || 'audio'}` : `${item.mode || 'audio'}`;
-                const historyDestEncoded = encodeURIComponent(item.destination || '');
-                const controls = ['error', 'cancelado'].includes(item.status)
+                const historyDestination = item.destination_root || item.destination || '';
+                const historyDestEncoded = encodeURIComponent(historyDestination);
+                const retryable = ['error', 'cancelado', 'interrumpido'].includes(item.status);
+                const active = ['iniciando', 'analizando', 'descargando', 'pausado'].includes(item.status);
+                const controls = retryable
                     ? `<button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${historyDestEncoded}')">Abrir carpeta</button>
                        <button class="btn btn-secondary" type="button" onclick="validateHistoryItem('${item.history_id}')">Validar archivos</button>
                        <button class="btn btn-secondary" type="button" onclick="retryHistoryItem('${item.history_id}')">Reintentar</button>`
                     : `<button class="btn btn-secondary" type="button" onclick="openFolderPathFromEncoded('${historyDestEncoded}')">Abrir carpeta</button>
                        <button class="btn btn-secondary" type="button" onclick="validateHistoryItem('${item.history_id}')">Validar archivos</button>`;
+                const counters = [
+                    Number(item.total_items || 0) > 0 ? `Total: ${Number(item.total_items)}` : '',
+                    Number(item.downloaded || 0) > 0 ? `Descargados: ${Number(item.downloaded)}` : '',
+                    Number(item.skipped || 0) > 0 ? `Omitidos: ${Number(item.skipped)}` : '',
+                    Number(item.failed || 0) > 0 ? `Fallidos: ${Number(item.failed)}` : ''
+                ].filter(Boolean).join(' | ');
+                const detailMessage = item.note || item.message || item.error || '';
                 return `
                     <div class="history-card">
                         <div class="history-body">
@@ -2508,10 +2674,12 @@
                                     </div>
                                     <span class="status-chip ${escapeHtml(statusClass)}">${escapeHtml(statusClass)}</span>
                                 </div>
-                                <div class="meta-line">Carpeta destino: ${escapeHtml(item.destination || 'Sin definir')}</div>
+                                <div class="meta-line">Carpeta de la tarea: ${escapeHtml(historyDestination || 'Sin definir')}</div>
                                 <div class="meta-line">Actualizado: ${escapeHtml(item.updated_at || item.created_at || '')}</div>
-                                ${item.speed || item.eta ? `<div class="meta-line">Velocidad: ${escapeHtml(item.speed || '--')} | ETA: ${escapeHtml(item.eta || '--')}</div>` : ''}
-                                ${item.progress ? `<div class="mini-progress"><span style="width:${Number(item.progress || 0)}%"></span></div>` : ''}
+                                ${active && (item.speed || item.eta) ? `<div class="meta-line">Velocidad: ${escapeHtml(item.speed || '--')} | ETA: ${escapeHtml(item.eta || '--')}</div>` : ''}
+                                ${counters ? `<div class="meta-line">${escapeHtml(counters)}</div>` : ''}
+                                ${detailMessage ? `<div class="meta-line">${escapeHtml(detailMessage)}</div>` : ''}
+                                <div class="mini-progress" role="progressbar" aria-label="Progreso" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.max(0, Math.min(100, Number(item.progress || 0)))}"><span style="width:${Math.max(0, Math.min(100, Number(item.progress || 0)))}%"></span></div>
                                 <div class="queue-actions">${controls}</div>
                             </div>
                         </div>
@@ -2530,6 +2698,11 @@
                 remoteQueueItems = queueRes.ok ? await queueRes.json() : [];
                 remoteBatchItems = batchRes.ok ? await batchRes.json() : [];
                 historyItems = historyRes.ok ? await historyRes.json() : [];
+                const reconciliation = window.YMDApp?.reconcileLocalPending?.(
+                    [...remoteQueueItems, ...remoteBatchItems],
+                    historyItems
+                );
+                if (Array.isArray(reconciliation?.jobs)) pendingDownloadQueue = reconciliation.jobs;
             } catch (e) {
                 console.error('Error refrescando paneles:', e);
             }
@@ -2677,6 +2850,7 @@
             queueUiSeq += 1;
             const job = {
                 uiId: `job_${Date.now()}_${queueUiSeq}`,
+                createdAt: Date.now(),
                 type: currentUrlType === 'video' ? 'single' : 'playlist',
                 label: currentDetected?.title || payload.album || 'Descarga',
                 payload,
@@ -2688,6 +2862,9 @@
             renderQueueList();
             if (result.action === 'added') {
                 addLog(`[OK] Tarea agregada a la cola: ${job.label}`);
+                setDownloadReminder('pending', `${job.label} está en la cola local. Falta pulsar Iniciar cola en la pestaña Descargas.`);
+                window.YMDApp?.toast('Agregada a la cola. Falta pulsar Iniciar cola en Descargas.', 'info');
+                window.YMDApp?.refreshDownloadStatus?.();
             }
         }
 
@@ -2742,6 +2919,7 @@
                 const submittedIds = new Set(pendingJobs.map((job) => job.uiId));
                 pendingDownloadQueue = pendingDownloadQueue.filter((job) => !submittedIds.has(job.uiId));
                 persistPendingQueue();
+                window.YMDApp?.refreshDownloadStatus?.();
                 addLog(`[OK] Cola entregada al backend: ${data.created} nuevas, ${data.duplicates} duplicadas`);
                 await refreshQueuePanels();
             } catch (error) {
@@ -2757,16 +2935,16 @@
         }
 
         function selectAllItems(value) {
+            currentVideos.forEach((_item, idx) => itemSelectionState.set(idx, value));
             document.querySelectorAll('.video-check').forEach(c => c.checked = value);
             syncGroupCheckboxes();
             updateSelectionCount();
         }
 
-        function selectByType(type) {
+        function selectByFilter(filter) {
+            currentVideos.forEach((item, idx) => itemSelectionState.set(idx, itemMatchesFilter(item, filter)));
             document.querySelectorAll('.video-check').forEach(c => {
-                const idx = Number(c.dataset.idx);
-                const item = currentVideos[idx];
-                c.checked = item && (item.item_type || 'song') === type;
+                c.checked = itemSelectionState.get(Number(c.dataset.idx)) === true;
             });
             syncGroupCheckboxes();
             updateSelectionCount();
@@ -2792,12 +2970,12 @@
         function setDisplayFilter(filter, options = {}) {
             const persist = options.persist !== false;
             const log = options.log !== false;
-            if (!['all', 'song', 'collection'].includes(filter)) return;
+            if (!['all', 'discography', 'album', 'single', 'ep', 'playlist', 'song', 'video', 'collection'].includes(filter)) return;
             displayFilter = filter;
             renderVideoList(currentVideos, true);
             if (persist) persistConfigPatch({ ui_display_filter: displayFilter });
             if (log) {
-                const label = filter === 'song' ? 'solo canciones' : filter === 'collection' ? 'solo albumes/colecciones' : 'todo';
+                const label = filter === 'all' ? 'todo' : filter === 'discography' ? 'discografia completa' : categoryLabel(filter, true).toLowerCase();
                 addLog(`[OK] Filtro visual: ${label}`);
             }
         }
@@ -2807,12 +2985,10 @@
             const log = options.log !== false;
             currentSelectionFilter = filter;
 
-            if (filter === 'song') {
-                selectByType('song');
-            } else if (filter === 'collection') {
-                selectByType('collection');
-            } else {
+            if (filter === 'all') {
                 selectAllItems(true);
+            } else {
+                selectByFilter(filter);
             }
 
             updateFilterButtons();
@@ -2820,18 +2996,14 @@
                 persistConfigPatch({ ui_selection_filter: currentSelectionFilter });
             }
             if (log) {
-                const label = filter === 'song' ? 'solo canciones' : filter === 'collection' ? 'solo albums/colecciones' : 'todo';
+                const label = filter === 'all' ? 'todo' : filter === 'discography' ? 'discografia completa' : categoryLabel(filter, true).toLowerCase();
                 addLog(`[OK] Filtro aplicado: ${label}`);
             }
         }
 
         function selectCompleteAlbums() {
-            document.querySelectorAll('.video-check').forEach((c) => {
-                const idx = Number(c.dataset.idx);
-                const item = currentVideos[idx];
-                c.checked = item && (item.item_type || 'song') === 'collection';
-            });
-            currentSelectionFilter = 'collection';
+            selectByFilter('album');
+            currentSelectionFilter = 'album';
             syncGroupCheckboxes();
             updateSelectionCount();
             updateFilterButtons();
@@ -2842,6 +3014,7 @@
         function toggleGroupItems(groupKey, checked) {
             document.querySelectorAll(`.video-check[data-group="${groupKey}"]`).forEach((chk) => {
                 chk.checked = checked;
+                itemSelectionState.set(Number(chk.dataset.idx), checked);
             });
         }
 
@@ -2870,6 +3043,7 @@
                 updateSelectionCount();
             }
             if (evt.target && evt.target.classList.contains('video-check')) {
+                itemSelectionState.set(Number(evt.target.dataset.idx), evt.target.checked);
                 syncGroupCheckboxes();
                 updateSelectionCount();
             }
@@ -2910,6 +3084,8 @@
                 if (data.error) {
                     markUrlState('invalid');
                     renderDetectedPreview(null);
+                    renderCatalogSummary(null);
+                    setDownloadReminder('error', data.error);
                     document.getElementById('queueBtn').disabled = true;
                     addLog(`[ERROR] ${data.error}`);
                     return;
@@ -2918,8 +3094,10 @@
 
                 currentUrlType = data.type;
                 currentVideos = data.videos || [];
+                itemSelectionState = new Map(currentVideos.map((item, idx) => [idx, item.selected_by_default !== false]));
                 currentDetected = data;
                 window.YMDApp?.notifyLinkDetected(data.title || data.type);
+                renderCatalogSummary(data);
 
                 const urlInfo = document.getElementById('urlInfo');
                 const badge = document.getElementById('urlBadge');
@@ -2931,13 +3109,22 @@
                     badge.textContent = data.type.toUpperCase();
 
                     if (data.type === 'artist') {
-                        typeInfo.innerHTML = `<strong>${data.title}</strong><br>Artista: ${data.uploader || 'Unknown'}<br>Total items: ${data.total_videos}<br>Colecciones: ${data.collections || 0}<br>Canciones: ${data.songs || 0}`;
+                        const scope = data.catalog_scope === 'releases'
+                            ? 'Álbumes, singles y EPs oficiales'
+                            : 'Discografía, playlists y contenido del canal';
+                        typeInfo.innerHTML = `<strong>${escapeHtml(data.title)}</strong><br>${escapeHtml(scope)}<br>${escapeHtml(data.source_message || '')}<br>Total: ${Number(data.total_videos || 0)} elementos · Colecciones: ${Number(data.collections || 0)} · Canciones/videos: ${Number(data.songs || 0)}`;
                     } else {
                         typeInfo.innerHTML = `<strong>${data.title}</strong><br>Artista: ${data.uploader || 'Unknown'}<br>Videos: ${data.total_videos}`;
                     }
 
+                    if (data.recommended_view && ['list', 'grouped', 'grid'].includes(data.recommended_view)) {
+                        viewMode = data.recommended_view;
+                    }
+                    if (data.recommended_display) displayFilter = data.recommended_display;
                     renderVideoList(currentVideos, false);
-                    applySelectionFilter(currentSelectionFilter, { persist: false, log: false });
+                    applySelectionFilter(data.recommended_selection || currentSelectionFilter, { persist: false, log: false });
+                    updateViewButtons();
+                    updateDisplayFilterControl();
                     document.getElementById('videoListSection').classList.remove('hidden');
                     document.getElementById('manualSection').classList.add('hidden');
                     document.getElementById('playlistFolderSection').classList.remove('hidden');
@@ -2947,6 +3134,8 @@
                     if (data.year) document.getElementById('yearInput').value = data.year;
 
                     addLog(`[OK] Detectado ${data.type}: ${currentVideos.length} items listos`);
+                    const selected = getSelectedItems().length;
+                    setDownloadReminder('ready', `Se detectaron ${currentVideos.length} elementos y ${selected} quedaron seleccionados. Revisa los filtros antes de descargar.`);
                 } else {
                     badge.className = 'badge badge-video';
                     badge.textContent = 'VIDEO';
@@ -2960,6 +3149,7 @@
                     document.getElementById('albumInput').value = data.album || '';
 
                     addLog('[OK] Video detectado');
+                    setDownloadReminder('ready', 'El enlace está listo. Revisa formato y etiquetas antes de descargar.');
                 }
 
                 renderDetectedPreview(data);
@@ -2972,12 +3162,14 @@
                 btn.textContent = 'Detectar';
                 markUrlState('invalid');
                 renderDetectedPreview(null);
+                renderCatalogSummary(null);
                 document.getElementById('queueBtn').disabled = true;
                 if (error.name === 'AbortError') {
                     addLog('[ERROR] Tiempo limite excedido (35s)');
                 } else {
                     addLog(`[ERROR] ${error.message}`);
                 }
+                setDownloadReminder('error', error.name === 'AbortError' ? 'La detección tardó demasiado. Intenta nuevamente.' : error.message);
             }
         }
 
@@ -3011,6 +3203,9 @@
                     } else {
                         addLog(`[OK] Descarga iniciada (ID: ${data.queue_id})`);
                     }
+                    setDownloadReminder('started', `${currentDetected?.title || 'La tarea'} se está procesando. El progreso seguirá en la pestaña Descargas.`);
+                    window.YMDApp?.toast('Descarga iniciada. Puedes seguir el progreso en Descargas.', 'success');
+                    window.YMDApp?.refreshDownloadStatus?.();
                     monitorDownload(null);
                 } else {
                     addLog(`[ERROR] ${data.error || 'No se pudo iniciar descarga'}`);
@@ -3023,11 +3218,33 @@
         function monitorDownload(activeJob = null) {
             if (statusCheckInterval) clearInterval(statusCheckInterval);
             lastMonitoredStatus = '';
+            let consecutiveFailures = 0;
 
             statusCheckInterval = setInterval(async () => {
                 try {
                     const res = await fetch(`/api/status/${currentQueueId}`);
                     const status = await res.json();
+
+                    if (!res.ok) {
+                        if (res.status === 404) {
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                            document.getElementById('downloadBtn').disabled = false;
+                            const message = 'La descarga ya no existe en el backend. La aplicación pudo haberse reiniciado.';
+                            addLog(`[AVISO] ${message}`);
+                            setDownloadReminder('error', `${message} Valida los archivos y reintenta desde el historial.`);
+                            if (activeJob) {
+                                activeJob.localStatus = 'error';
+                                activeQueueUiId = null;
+                                renderQueueList();
+                            }
+                            await refreshQueuePanels();
+                            return;
+                        }
+                        throw new Error(status.error || `HTTP ${res.status}`);
+                    }
+
+                    consecutiveFailures = 0;
 
                     if (!status.error) {
                         const statusChanged = lastMonitoredStatus !== status.status;
@@ -3044,6 +3261,7 @@
                             clearInterval(statusCheckInterval);
                             statusCheckInterval = null;
                             document.getElementById('downloadBtn').disabled = false;
+                            setDownloadReminder('completed', status.message || 'Todo el contenido seleccionado terminó correctamente.');
                             if (activeJob) {
                                 activeJob.localStatus = 'completado';
                                 activeJob.progress = 100;
@@ -3059,6 +3277,7 @@
                             clearInterval(statusCheckInterval);
                             statusCheckInterval = null;
                             document.getElementById('downloadBtn').disabled = false;
+                            setDownloadReminder('error', status.message || 'La descarga encontró un error.');
                             if (activeJob) {
                                 activeJob.localStatus = 'error';
                                 activeJob.progress = status.progress || 0;
@@ -3103,6 +3322,19 @@
                     }
                 } catch (error) {
                     console.error('Error monitoreando:', error);
+                    consecutiveFailures += 1;
+                    if (consecutiveFailures >= 3) {
+                        clearInterval(statusCheckInterval);
+                        statusCheckInterval = null;
+                        document.getElementById('downloadBtn').disabled = false;
+                        addLog('[ERROR] Se perdió la conexión con el backend. Revisa el historial antes de reintentar.');
+                        setDownloadReminder('error', 'Se perdió la conexión con el backend. El monitoreo se detuvo de forma segura.');
+                        if (activeJob) {
+                            activeJob.localStatus = 'error';
+                            activeQueueUiId = null;
+                            renderQueueList();
+                        }
+                    }
                 }
             }, 1000);
         }
@@ -3114,6 +3346,8 @@
             const listHeightRange = document.getElementById('listHeightRange');
             const writeSubtitles = document.getElementById('writeSubtitles');
             const embedSubtitles = document.getElementById('embedSubtitles');
+            const singleFolderMode = document.getElementById('singleFolderMode');
+            const singleFolderTemplate = document.getElementById('singleFolderTemplate');
             const playlistFolderMode = document.getElementById('playlistFolderMode');
             const playlistFolderTemplate = document.getElementById('playlistFolderTemplate');
             updateUrlPreview(urlInput.value || '');
@@ -3172,6 +3406,12 @@
                     persistConfigPatch({ embed_subtitles: runtimeConfig.embed_subtitles });
                 });
             }
+            if (singleFolderMode) {
+                singleFolderMode.addEventListener('change', handleSingleFolderModeChange);
+            }
+            if (singleFolderTemplate) {
+                singleFolderTemplate.addEventListener('change', handleSingleFolderTemplateChange);
+            }
             if (playlistFolderMode) {
                 playlistFolderMode.addEventListener('change', handlePlaylistFolderModeChange);
             }
@@ -3192,10 +3432,10 @@
                     ...config
                 };
                 viewMode = ['list', 'grouped', 'grid'].includes(config.ui_render_mode) ? config.ui_render_mode : 'list';
-                displayFilter = ['all', 'song', 'collection'].includes(config.ui_display_filter)
+                displayFilter = ['all', 'discography', 'album', 'single', 'ep', 'playlist', 'song', 'video', 'collection'].includes(config.ui_display_filter)
                     ? config.ui_display_filter
                     : (config.ui_albums_only_mode === true ? 'collection' : 'all');
-                currentSelectionFilter = ['all', 'song', 'collection'].includes(config.ui_selection_filter) ? config.ui_selection_filter : 'all';
+                currentSelectionFilter = ['all', 'discography', 'album', 'single', 'ep', 'playlist', 'song', 'video', 'collection'].includes(config.ui_selection_filter) ? config.ui_selection_filter : 'all';
                 currentSearchTerm = (config.ui_item_search || '').toString();
                 if (searchInput) searchInput.value = currentSearchTerm;
                 setVideoListHeight(config.ui_list_height || 560, false);
