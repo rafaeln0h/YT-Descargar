@@ -1,6 +1,6 @@
 # Fuentes, referencias y atribuciones
 
-Última revisión: 2026-07-31.
+Última revisión: 2026-08-10.
 
 Este archivo documenta de dónde provino la investigación funcional. Los enlaces
 sirven como referencia; no se copió código ni material visual de programas
@@ -11,6 +11,9 @@ comerciales.
 | Proyecto | Uso en la investigación |
 |---|---|
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Motor, postprocesadores, metadatos y compatibilidad de sitios |
+| [yt-dlp-ejs](https://github.com/yt-dlp/ejs) | Scripts oficiales para resolver los desafíos JavaScript de YouTube |
+| [Deno](https://deno.com/) | Runtime JavaScript recomendado por yt-dlp |
+| [curl-cffi](https://github.com/lexiforest/curl_cffi) | Compatibilidad de red e impersonación TLS usada por yt-dlp |
 | [youtube-dl](https://github.com/ytdl-org/youtube-dl) | Antecedente histórico del ecosistema |
 | [YoutubeDownloader](https://github.com/Tyrrrz/YoutubeDownloader) | UX de escritorio, selección de streams y capítulos |
 | [Arroxy](https://github.com/antonio-orionus/Arroxy) | Interfaz web y flujo de descarga |

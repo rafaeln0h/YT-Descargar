@@ -4,7 +4,8 @@
 
 | Versión | Soporte |
 |---|---|
-| `0.012` | Sí |
+| `0.013` | Sí |
+| `0.012` | No |
 | Anteriores | No |
 
 La tabla se actualizará en cada publicación. Sólo la versión más reciente recibe
@@ -29,4 +30,3 @@ corrección y publicación. No se promete un SLA durante la etapa comunitaria.
 
 Nunca publiques cookies, tokens, rutas personales, medios privados ni URLs de
 stream firmadas en reportes.
-

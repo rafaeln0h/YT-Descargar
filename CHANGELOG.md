@@ -2,7 +2,7 @@
 
 Este proyecto sigue un esquema incremental propio (`0.012`, `0.013`, …).
 
-## Sin publicar
+## [0.013] - 2026-08-10
 
 - Actualización reproducible a `yt-dlp 2026.07.04` con sus extras oficiales de
   EJS, Deno y `curl-cffi`; Node.js queda disponible como respaldo automático.
@@ -11,6 +11,8 @@ Este proyecto sigue un esquema incremental propio (`0.012`, `0.013`, …).
 - Diagnóstico visible de Python, yt-dlp, EJS, runtime JavaScript, FFmpeg y
   proveedores opcionales de PO Token.
 - Python mínimo actualizado a 3.11 y CI validada en Python 3.11 y 3.13.
+- GitHub Actions actualizadas a `actions/checkout@v7` y
+  `actions/setup-python@v7`; las releases adjuntan ZIP y checksum SHA-256.
 - Detección ordenada de discografías: los enlaces de artista combinan álbumes,
   singles, EPs y playlists; las secciones `/browse/MPAD...` muestran únicamente
   lanzamientos oficiales con artista, tipo y año correctos.
@@ -78,3 +80,4 @@ Este proyecto sigue un esquema incremental propio (`0.012`, `0.013`, …).
   pública `0.012`.
 
 [0.012]: https://github.com/rafaeln0h/YT-Descargar/releases/tag/v0.012
+[0.013]: https://github.com/rafaeln0h/YT-Descargar/releases/tag/v0.013

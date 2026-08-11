@@ -1,9 +1,10 @@
 # Comparativa con productos comerciales
 
-Revisión: 2026-07-31. Fuente primaria:
+Revisión de productos externos: 2026-07-31. Estado de YT-Descargar actualizado
+para v0.013. Fuente primaria:
 [páginas oficiales](SOURCES.md#productos-comerciales-comparados).
 
-| Capacidad | YT-Descargar 0.012 | SnapDownloader | 4K Video Downloader+ | MediaHuman | iTubeGo |
+| Capacidad | YT-Descargar 0.013 | SnapDownloader | 4K Video Downloader+ | MediaHuman | iTubeGo |
 |---|---:|---:|---:|---:|---:|
 | Cola y descargas múltiples | Sí | Sí | Sí | Sí | Sí |
 | Playlists/canales | Sí | Sí | Sí | Sí | Sí |
@@ -47,4 +48,3 @@ consultada; no demuestra ausencia.
 
 La ventaja buscada no es tener más botones: es una herramienta local,
 auditables, accesible, con metadatos trazables y recuperación clara de fallos.
-

@@ -1,18 +1,23 @@
 ================================================================================
-  YT-DESCARGAR 0.012
+  YT-DESCARGAR 0.013
 ================================================================================
 
 INICIO RAPIDO:
 
-  1. Haz doble clic en: start.bat
+  1. Descarga la ultima version desde:
+     https://github.com/rafaeln0h/YT-Descargar/releases/latest
 
-  2. Se abrira automaticamente en: http://127.0.0.1:5000
+  2. Verifica el SHA-256 indicado en SHA256SUMS.txt
 
-  3. Pega URL de YouTube o YouTube Music
+  3. Extrae el ZIP y haz doble clic en: start.bat
 
-  4. Haz clic en "Detectar"
+  4. Se abrira automaticamente en: http://127.0.0.1:5000
 
-  5. Haz clic en "Descargar"
+  5. Pega URL de YouTube o YouTube Music
+
+  6. Haz clic en "Detectar"
+
+  7. Haz clic en "Descargar"
 
 ESO ES TODO!
 
@@ -24,7 +29,7 @@ OPCIONES DE INICIO:
 ================================================================================
 
 REQUISITOS:
-  - Python 3.10+ (https://www.python.org/downloads/)
+  - Python 3.11+ (https://www.python.org/downloads/)
   - FFmpeg/ffprobe en PATH o conexion para configurarlo en Windows
 
 FEATURES:
@@ -37,11 +42,13 @@ FEATURES:
   - Metadatos y letras incrustados sin archivos .info.json adicionales
   - Album art automatico
   - Organizacion inteligente (artista/album/ano)
+  - Sencillos agrupados por artista
+  - Diagnostico de yt-dlp, EJS, Deno/Node y FFmpeg
 
 SI NO FUNCIONA:
 
   Error: "ModuleNotFoundError"
-  Solucion: pip install flask flask-cors yt-dlp mutagen musicbrainzngs pillow requests
+  Solucion: python -m pip install -U -r requirements.txt
 
   Error: "Port 5000 already in use"
   Solucion: start.bat 5001

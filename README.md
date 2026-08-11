@@ -1,6 +1,6 @@
 # YT-Descargar
 
-[![Versión](https://img.shields.io/badge/versión-0.012-6c5ce7)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versión-0.013-6c5ce7)](CHANGELOG.md)
 [![Pruebas](https://github.com/rafaeln0h/YT-Descargar/actions/workflows/tests.yml/badge.svg)](https://github.com/rafaeln0h/YT-Descargar/actions/workflows/tests.yml)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-2d3436)](LICENSE)
 
@@ -17,7 +17,7 @@ Music mediante `yt-dlp` y FFmpeg.
 | Metadatos y fuentes | Mantenimiento y diagnóstico |
 | ![Etiquetas avanzadas](docs/assets/screenshots/metadatos-v0.012.png) | ![Herramientas de mantenimiento](docs/assets/screenshots/mantenimiento-v0.012.png) |
 
-## Funciones de v0.012
+## Funciones de v0.013
 
 - Videos, canciones, playlists, álbumes y canales.
 - Audio MP3, M4A, FLAC, OGG/OPUS y WAV; video MP4 y MKV.
@@ -43,11 +43,14 @@ Music mediante `yt-dlp` y FFmpeg.
 
 ## Inicio rápido en Windows
 
-1. Instala [Python 3.11 o posterior](https://www.python.org/downloads/windows/).
-2. Ejecuta `start.bat`.
-3. Abre `http://127.0.0.1:5000` si el navegador no se abre solo.
-4. Pega una URL, pulsa **Detectar**, revisa formato y tags, y descarga.
-5. Abre **Biblioteca** para reproducir los archivos locales.
+1. Descarga `YT-Descargar-v0.013.zip` desde la
+   [release más reciente](https://github.com/rafaeln0h/YT-Descargar/releases/latest).
+2. Verifica el archivo con el SHA-256 publicado en `SHA256SUMS.txt`.
+3. Instala [Python 3.11 o posterior](https://www.python.org/downloads/windows/).
+4. Extrae el ZIP y ejecuta `start.bat`.
+5. Abre `http://127.0.0.1:5000` si el navegador no se abre solo.
+6. Pega una URL, pulsa **Detectar**, revisa formato y tags, y descarga.
+7. Abre **Biblioteca** para reproducir los archivos locales.
 
 Instalación manual:
 
@@ -125,14 +128,16 @@ GitHub Release estable más reciente. Antes de publicar, actualiza la versión t
 `ymd/version.py` como en `pyproject.toml`, integra los cambios en `main` y crea el tag:
 
 ```powershell
-git tag -a v0.013 -m "YT-Descargar v0.013"
+$tag = "vX.XXX"
+git tag -a $tag -m "YT-Descargar $tag"
 git push origin main
-git push origin v0.013
+git push origin $tag
 ```
 
 El workflow `publish-release` ejecuta las pruebas, valida que el tag coincida con la
-versión de la aplicación y publica la Release. En la siguiente comprobación, los clientes
-verán un aviso discreto con enlace a sus cambios; nunca se reemplaza código automáticamente.
+versión de la aplicación y publica la Release con un ZIP y su checksum SHA-256.
+En la siguiente comprobación, los clientes verán un aviso discreto con enlace a
+sus cambios; nunca se reemplaza código automáticamente.
 
 ### Organización inteligente de playlists
 
@@ -169,6 +174,7 @@ dedicados. Consulta [Comunidad y solicitudes](docs/COMMUNITY.md) o participa en
 
 ## Documentación
 
+- [Notas de v0.013](docs/releases/v0.013.md)
 - [Notas de v0.012](docs/releases/v0.012.md)
 - [Arquitectura](docs/ARCHITECTURE.md)
 - [Tags y letras](docs/TAGS.md)

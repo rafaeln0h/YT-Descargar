@@ -12,8 +12,8 @@ jobs:
   verify-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -25,7 +25,22 @@ jobs:
           assert tag == RELEASE_TAG, f'El tag {tag} no coincide con {RELEASE_TAG}'"
       - run: python -m unittest discover -s tests -v
       - run: ruff check app_playlist.py ymd tests
+      - name: Build downloadable archive and checksum
+        shell: bash
+        run: |
+          artifact="YT-Descargar-${GITHUB_REF_NAME}.zip"
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          test -f "$notes"
+          git archive --format=zip --output="$artifact" HEAD
+          sha256sum "$artifact" > SHA256SUMS.txt
+          echo "RELEASE_ARTIFACT=$artifact" >> "$GITHUB_ENV"
+          echo "RELEASE_NOTES=$notes" >> "$GITHUB_ENV"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "$RELEASE_ARTIFACT" SHA256SUMS.txt
+          --verify-tag
+          --notes-file "$RELEASE_NOTES"
+          --title "YT-Descargar $GITHUB_REF_NAME"

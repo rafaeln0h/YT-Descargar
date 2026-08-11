@@ -69,7 +69,8 @@ Los mensajes de yt-dlp ya no se descartan silenciosamente.
 
 ## Próximas fronteras
 
-- `ymd/downloader.py`: opciones y ejecución de yt-dlp.
+- `ymd/runtime.py`: detección de Deno/Node, diagnóstico y opciones comunes de yt-dlp.
+- `ymd/downloader.py`: futura extracción de la ejecución que aún vive en `app_playlist.py`.
 - `ymd/jobs.py`: máquina de estados y cancelación cooperativa.
 - `ymd/storage.py`: SQLite para trabajos, historial, archivos y suscripciones.
 - `ymd/enrichment/`: MusicBrainz, Cover Art Archive y letras con caché.

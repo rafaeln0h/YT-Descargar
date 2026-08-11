@@ -6,7 +6,6 @@
 - Problemas frecuentes: consulta
   [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
-Incluye versión (`0.012`), sistema operativo, versión de Python, resultado de
+Incluye versión (`0.013`), sistema operativo, versión de Python, resultado de
 `yt-dlp --version`, formato solicitado y logs saneados. El soporte es
 comunitario y no tiene SLA.
-

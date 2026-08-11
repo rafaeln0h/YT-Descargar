@@ -1,4 +1,4 @@
-# Roadmap 0.012–0.016
+# Roadmap 0.013–0.016
 
 El orden puede cambiar después de pruebas y comentarios. Cada integración
 requiere autorización de `@rafaeln0h`.
@@ -10,16 +10,20 @@ requiere autorización de `@rafaeln0h`.
 - Biblioteca local, minirreproductor, Range y logs.
 - Investigación comercial/multiplataforma y contratos de capacidades.
 
-## 0.013 — estabilidad y cola persistente
+## 0.013 — estabilidad y descargas
 
-- Migrar cola/historial/configuración a almacenamiento atómico o SQLite.
-- Recuperar tareas interrumpidas y reanudar cuando yt-dlp lo permita.
-- Identidad de duplicados por extractor + ID + perfil, no sólo filename.
-- Pantalla de diagnóstico de Python, yt-dlp, FFmpeg, cookies y permisos.
-- Tests de integración con extractor/postprocesadores simulados.
+- Historial atómico y recuperación de tareas interrumpidas sin borrar medios.
+- Reintento de tareas recuperadas y validación de archivos en múltiples álbumes.
+- Diagnóstico de Python, yt-dlp, EJS, Deno/Node y FFmpeg desde la interfaz.
+- Discografías verificadas de YouTube Music y organización configurable de sencillos.
+- yt-dlp estable con dependencias recomendadas y selección automática de cliente.
+- ZIP descargable, checksum SHA-256 y CI en Windows/Ubuntu.
 
 ## 0.014 — biblioteca y editor de metadatos
 
+- Migrar cola, historial y configuración a SQLite con migraciones versionadas.
+- Identidad de duplicados por extractor, ID y perfil, no sólo por filename.
+- Reanudación por fragmentos cuando el extractor y el formato lo permitan.
 - Editor individual/masivo con vista previa, diff, deshacer y retag.
 - Caché y revisión manual de coincidencias MusicBrainz.
 - Carátula/letra para más contenedores y `.lrc` sincronizado.

@@ -2,7 +2,7 @@
 
 Base predeterminada: `http://127.0.0.1:5000`.
 
-La API de v0.012 no implementa autenticación y sólo debe exponerse en loopback.
+La API de v0.013 no implementa autenticación y sólo debe exponerse en loopback.
 No publiques el puerto en Internet.
 
 ## Cola persistente

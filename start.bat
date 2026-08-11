@@ -20,7 +20,7 @@ if /I "%~2"=="debug" set "DEBUG_FLAG=--debug"
 if not exist "%LOG_DIR%" mkdir "%LOG_DIR%" >nul 2>&1
 
 echo ==========================================
-echo   YT-Descargar 0.012 - Launcher
+echo   YT-Descargar 0.013 - Launcher
 echo ==========================================
 echo [INFO] Carpeta: %ROOT%
 echo [INFO] Log de inicio: %APP_LOG%
