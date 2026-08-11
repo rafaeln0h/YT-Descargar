@@ -91,6 +91,8 @@ class RouteTests(unittest.TestCase):
         self.assertIn("musicbrainz", payload["metadata_sources"])
         self.assertEqual(payload["lyrics_sources"], ["youtube_captions", "lrclib"])
         self.assertFalse(payload["features"]["metadata_sidecar"])
+        self.assertIn("yt_dlp", payload["runtime"])
+        self.assertIn("javascript", payload["runtime"])
 
 
 if __name__ == "__main__":

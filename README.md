@@ -29,6 +29,8 @@ Music mediante `yt-dlp` y FFmpeg.
 - Metadatos incrustados directamente; no crea archivos `.info.json`.
 - Covers cuadrados de álbum con procedencia registrada, letras desde captions/LRCLIB,
   plantillas de carpetas y nombres.
+- Sencillos agrupables en `Artista/Singles`, opcionalmente por año o mediante una
+  plantilla personalizada, sin mezclar álbumes ni EP.
 - Biblioteca visual por artistas, álbumes, playlists, canciones y videos, con covers,
   letras, cola contextual y streaming HTTP Range.
 - Reproductor con anterior/siguiente, progreso, volumen, silencio, aleatorio,
@@ -41,7 +43,7 @@ Music mediante `yt-dlp` y FFmpeg.
 
 ## Inicio rápido en Windows
 
-1. Instala [Python 3.10 o posterior](https://www.python.org/downloads/windows/).
+1. Instala [Python 3.11 o posterior](https://www.python.org/downloads/windows/).
 2. Ejecuta `start.bat`.
 3. Abre `http://127.0.0.1:5000` si el navegador no se abre solo.
 4. Pega una URL, pulsa **Detectar**, revisa formato y tags, y descarga.
@@ -68,6 +70,10 @@ python app_playlist.py
 FFmpeg debe estar en `PATH` o en `ffmpeg_portable/`. Chromaprint/`fpcalc` es
 opcional y sólo se necesita para AcoustID. Consulta [Dependencias y APIs](docs/DEPENDENCIES_AND_APIS.md)
 y [Solución de problemas](docs/TROUBLESHOOTING.md).
+
+La instalación incluye el grupo oficial `yt-dlp[default]`, `yt-dlp-ejs`, Deno y
+`curl-cffi`. En Configuración → Sistema puedes confirmar el runtime activo,
+FFmpeg y las versiones cargadas por la aplicación.
 
 ## Estructura
 
@@ -167,6 +173,7 @@ dedicados. Consulta [Comunidad y solicitudes](docs/COMMUNITY.md) o participa en
 - [Arquitectura](docs/ARCHITECTURE.md)
 - [Tags y letras](docs/TAGS.md)
 - [Biblioteca y reproductor](docs/LIBRARY_PLAYER.md)
+- [Enlaces de artista y discografía](docs/YOUTUBE_MUSIC_LINKS.md)
 - [API local](docs/API.md)
 - [Dependencias, APIs y privacidad](docs/DEPENDENCIES_AND_APIS.md)
 - [Comunidad y solicitudes](docs/COMMUNITY.md)

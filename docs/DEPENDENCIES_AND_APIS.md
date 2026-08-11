@@ -7,14 +7,14 @@ sale del equipo. La aplicación funciona en `127.0.0.1` y no requiere una cuenta
 
 | Componente | Versión declarada | Uso | Dirección oficial |
 |---|---|---|---|
-| Python | 3.10 o posterior | Backend y tareas | https://www.python.org/ |
+| Python | 3.11 o posterior | Backend y tareas | https://www.python.org/ |
 | Flask | `>=3.1,<4` | Servidor web local | https://flask.palletsprojects.com/ |
 | Flask-Cors | `>=5,<7` | CORS limitado a loopback | https://flask-cors.readthedocs.io/ |
-| yt-dlp | `>=2026.6.9` | Detección y descarga autorizada | https://github.com/yt-dlp/yt-dlp |
+| yt-dlp | `[default,curl-cffi,deno]>=2026.7.4` | Detección, EJS, runtime JS e impersonación compatible | https://github.com/yt-dlp/yt-dlp |
 | FFmpeg/ffprobe | disponible en `PATH` o `ffmpeg_portable/` | Conversión y análisis multimedia | https://ffmpeg.org/ |
 | Mutagen | `>=1.47,<2` | Lectura y escritura de tags | https://mutagen.readthedocs.io/ |
 | musicbrainzngs | `>=0.7.1,<1` | Cliente MusicBrainz | https://python-musicbrainzngs.readthedocs.io/ |
-| ytmusicapi | `>=1.12.1,<2` | Consulta opcional de álbumes y créditos públicos de YouTube Music | https://ytmusicapi.readthedocs.io/ |
+| ytmusicapi | `>=1.12.2,<2` | Consulta opcional de álbumes y créditos públicos de YouTube Music | https://ytmusicapi.readthedocs.io/ |
 | Pillow | `>=11,<13` | Validación y recorte cuadrado de covers | https://pillow.readthedocs.io/ |
 | Requests | `>=2.32,<3` | HTTP con timeouts y límites | https://requests.readthedocs.io/ |
 
@@ -26,6 +26,11 @@ py -m venv .venv
 python -m pip install -r requirements.txt
 python app_playlist.py
 ```
+
+El cliente de YouTube queda en `auto`. La aplicación selecciona Deno y usa Node.js
+como respaldo, y muestra el resultado en `/api/system/capabilities`. No se fuerza
+`web_music`: ese cliente necesita GVS PO Token para algunos formatos. Los proveedores
+automáticos de PO Token son plugins de terceros y permanecen como integración opcional.
 
 `ytmusicapi` es un paquete Python puro (`py3-none-any`). AcoustID se integra
 directamente con `requests` y el ejecutable oficial `fpcalc`, sin instalar otro

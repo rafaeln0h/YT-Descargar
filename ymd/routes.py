@@ -18,6 +18,7 @@ from .library import (
     resolve_media_path,
     scan_library,
 )
+from .runtime import runtime_diagnostics
 from .updates import DEFAULT_REPOSITORY, check_latest_release
 from .version import version_payload
 
@@ -26,6 +27,7 @@ def create_services_blueprint(
     config_loader: Callable[[], dict],
     *,
     log_path: str | Path,
+    ffmpeg_path: str | Path | None = None,
 ) -> Blueprint:
     blueprint = Blueprint("ymd_services", __name__)
     application_log = Path(log_path).resolve()
@@ -145,9 +147,11 @@ def create_services_blueprint(
 
     @blueprint.get("/api/system/capabilities")
     def system_capabilities():
+        config = config_loader()
         return jsonify(
             {
                 **version_payload(),
+                "runtime": runtime_diagnostics(config, ffmpeg_path=ffmpeg_path),
                 "features": {
                     "audio_download": True,
                     "video_download": True,

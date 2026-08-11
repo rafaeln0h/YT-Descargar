@@ -38,6 +38,11 @@ Contrato de descubrimiento para futuros clientes. Devuelve funciones, formatos,
 contenedores etiquetables, fuentes de metadata y plataformas actuales/planeadas.
 Los clientes deben probar capacidades; no inferirlas sólo por versión.
 
+El objeto `runtime` incluye el estado y las versiones de Python, yt-dlp,
+`yt-dlp-ejs`, `curl-cffi`, Deno/Node, FFmpeg/ffprobe, el cliente de YouTube y
+proveedores opcionales de PO Token. Las rutas se muestran porque la API es local
+y sirven para diagnosticar entornos virtuales o instalaciones duplicadas.
+
 ### `GET /api/system/update`
 
 Consulta de forma limitada la última GitHub Release estable. Usa caché local y ETag; una

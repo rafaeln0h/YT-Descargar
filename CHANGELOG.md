@@ -2,6 +2,28 @@
 
 Este proyecto sigue un esquema incremental propio (`0.012`, `0.013`, …).
 
+## Sin publicar
+
+- Actualización reproducible a `yt-dlp 2026.07.04` con sus extras oficiales de
+  EJS, Deno y `curl-cffi`; Node.js queda disponible como respaldo automático.
+- Selección automática del cliente de YouTube en lugar de forzar `web_music`,
+  evitando avisos masivos de GVS PO Token y formatos propensos a HTTP 403.
+- Diagnóstico visible de Python, yt-dlp, EJS, runtime JavaScript, FFmpeg y
+  proveedores opcionales de PO Token.
+- Python mínimo actualizado a 3.11 y CI validada en Python 3.11 y 3.13.
+- Detección ordenada de discografías: los enlaces de artista combinan álbumes,
+  singles, EPs y playlists; las secciones `/browse/MPAD...` muestran únicamente
+  lanzamientos oficiales con artista, tipo y año correctos.
+- Filtros independientes para álbumes, singles, EPs, playlists y videos, con una
+  selección de discografía segura que evita videos del canal por defecto.
+- Recordatorio interno después de detectar, contador en la pestaña Descargas y
+  aviso flotante de progreso que permanece al navegar por la aplicación.
+- Organización específica de sencillos: una sola carpeta `Singles` por artista,
+  separación opcional por año, carpeta por lanzamiento o plantilla personalizada,
+  disponible tanto en Configuración como en el menú de descarga.
+- Reconciliación automática de la cola local del navegador con el historial y la
+  cola persistente para retirar pendientes que el backend ya recibió o completó.
+
 ## [0.012] - 2026-07-31
 
 - Interfaz completa inspirada en YouTube Music en las páginas principales, con
