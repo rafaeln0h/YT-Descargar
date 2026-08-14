@@ -1,7 +1,7 @@
 flask>=3.1,<4
 flask-cors>=5,<7
 yt-dlp[default,curl-cffi,deno]>=2026.7.4
-mutagen>=1.47,<2
+mutagen>=1.48.1,<2
 musicbrainzngs>=0.7.1,<1
 ytmusicapi>=1.12.2,<2
 pillow>=11,<13
